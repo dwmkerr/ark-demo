@@ -1,0 +1,102 @@
+
+{{- if .Values.models.anthropic.enabled }}
+{{- range .Values.models.anthropic.models }}
+---
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: Model
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "dwmkerr-starter-kit.labels" $ | nindent 4 }}
+spec:
+  type: openai
+  model:
+    value: {{ .model }}
+  config:
+    openai:
+      baseUrl:
+        value: {{ $.Values.models.anthropic.baseUrl | quote }}
+      apiKey:
+        valueFrom:
+          secretKeyRef:
+            name: anthropic-api-key
+            key: apiKey
+{{- end }}
+{{- end }}
+
+{{- if .Values.models.gemini.enabled }}
+{{- range .Values.models.gemini.models }}
+---
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: Model
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "dwmkerr-starter-kit.labels" $ | nindent 4 }}
+spec:
+  type: openai
+  model:
+    value: {{ .model }}
+  config:
+    openai:
+      baseUrl:
+        value: {{ $.Values.models.gemini.baseUrl | quote }}
+      apiKey:
+        valueFrom:
+          secretKeyRef:
+            name: gemini-model-token
+            key: apiKey
+{{- end }}
+{{- end }}
+
+{{- if and .Values.models.azureOpenAI.enabled .Values.models.azureOpenAI.baseUrl }}
+{{- range .Values.models.azureOpenAI.models }}
+---
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: Model
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "dwmkerr-starter-kit.labels" $ | nindent 4 }}
+spec:
+  type: azure
+  model:
+    value: {{ .model }}
+  config:
+    azure:
+      baseUrl:
+        value: {{ $.Values.models.azureOpenAI.baseUrl | quote }}
+      apiVersion:
+        value: "2024-12-01-preview"
+      apiKey:
+        valueFrom:
+          secretKeyRef:
+            name: dwmkerr-azure-openai-secret
+            key: apiKey
+{{- end }}
+{{- end }}
+
+{{- if .Values.models.openai.enabled }}
+{{- range .Values.models.openai.models }}
+---
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: Model
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "dwmkerr-starter-kit.labels" $ | nindent 4 }}
+spec:
+  type: openai
+  model:
+    value: {{ .model }}
+  config:
+    openai:
+      baseUrl:
+        value: {{ $.Values.models.openai.baseUrl | quote }}
+      apiKey:
+        valueFrom:
+          secretKeyRef:
+            name: openai-api-key
+            key: apiKey
+{{- end }}
+{{- end }}
