@@ -8,6 +8,8 @@ metadata:
   name: {{ .name }}
   labels:
     {{- include "dwmkerr-starter-kit.labels" $ | nindent 4 }}
+  annotations:
+    ark.mckinsey.com/dashboard-icon: "/icons/claude.png"
 spec:
   type: openai
   model:
@@ -33,6 +35,8 @@ metadata:
   name: {{ .name }}
   labels:
     {{- include "dwmkerr-starter-kit.labels" $ | nindent 4 }}
+  annotations:
+    ark.mckinsey.com/dashboard-icon: "/icons/gemini.png"
 spec:
   type: openai
   model:
