@@ -1,0 +1,20 @@
+{{- if .Values.agents }}
+{{- range .Values.agents }}
+---
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: Agent
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "dwmkerr-starter-kit.labels" $ | nindent 4 }}
+spec:
+  {{- if eq .model "default" }}
+  # Uses default model configured in the system
+  {{- else }}
+  modelRef:
+    name: {{ .model }}
+  {{- end }}
+  prompt: |
+{{ .description | nindent 4 }}
+{{- end }}
+{{- end }}

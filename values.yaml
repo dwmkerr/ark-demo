@@ -1,0 +1,61 @@
+# Model providers configuration
+models:
+  # Anthropic provider
+  anthropic:
+    enabled: true
+    apiKey: ""  # Set your Anthropic API key here
+    baseUrl: "https://api.anthropic.com/v1/"
+    models:
+      - name: claude-3-5-sonnet
+        model: claude-3-5-sonnet-20241022
+      - name: claude-3-5-haiku
+        model: claude-3-5-haiku-20241022
+      - name: claude-4-opus
+        model: claude-opus-4-20250514
+
+  # Google Gemini provider  
+  gemini:
+    enabled: true
+    apiKey: ""  # Set your Gemini API key here
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/"
+    models:
+      - name: gemini-1-5-flash
+        model: gemini-1.5-flash
+      - name: gemini-2-5-flash-lite
+        model: gemini-2.5-flash-lite
+
+  # Azure OpenAI provider
+  azureOpenAI:
+    enabled: false  # Disabled to avoid creating default model
+    apiKey: ""  # Set your Azure OpenAI API key here
+    baseUrl: "https://lxo.openai.azure.com"
+    apiVersion: "2024-12-01-preview"
+    models: []  # No models to avoid conflicts
+
+  # OpenAI provider
+  openai:
+    enabled: false
+    apiKey: ""  # Set your OpenAI API key here
+    baseUrl: "https://api.openai.com/v1/"
+    models: []
+
+
+# Agent configuration
+agents:
+  - name: planner
+    model: claude-3-5-haiku  # Use Anthropic's Claude Haiku instead of default
+    description: |
+      I'm a planning specialist who helps break down complex tasks into manageable steps and create actionable plans.
+  
+  - name: code-reviewer
+    model: claude-4-opus  # Use Anthropic's Claude 4 Opus for advanced code review
+    description: |
+      I'm a code review specialist who helps improve code quality, identifies issues, and suggests improvements.
+
+# Team configuration
+teams:
+  - name: coding-team
+    members:
+      - planner
+      - code-reviewer
+    strategy: sequential  # Options: simple, sequential
