@@ -44,11 +44,13 @@ models:
 agents:
   - name: planner
     model: claude-3-5-haiku  # Use Anthropic's Claude Haiku instead of default
+    dashboardIcon: "/icons/claude.png"
     description: |
       I'm a planning specialist who helps break down complex tasks into manageable steps and create actionable plans.
   
   - name: code-reviewer
     model: claude-4-opus  # Use Anthropic's Claude 4 Opus for advanced code review
+    dashboardIcon: "/icons/claude.png"
     description: |
       I'm a code review specialist who helps improve code quality, identifies issues, and suggests improvements.
 

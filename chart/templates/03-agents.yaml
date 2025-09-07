@@ -8,12 +8,8 @@ metadata:
   labels:
     {{- include "dwmkerr-starter-kit.labels" $ | nindent 4 }}
   annotations:
-    {{- if or (contains "claude" .model) (contains "anthropic" .model) }}
-    ark.mckinsey.com/dashboard-icon: "/icons/claude.png"
-    {{- else if or (contains "gemini" .model) (contains "google" .model) }}
-    ark.mckinsey.com/dashboard-icon: "/icons/gemini.png"
-    {{- else if eq .model "default" }}
-    ark.mckinsey.com/dashboard-icon: "/icons/azure.png"
+    {{- if .dashboardIcon }}
+    ark.mckinsey.com/dashboard-icon: {{ .dashboardIcon | quote }}
     {{- end }}
 spec:
   {{- if eq .model "default" }}
