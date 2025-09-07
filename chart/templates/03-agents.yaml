@@ -7,6 +7,10 @@ metadata:
   name: {{ .name }}
   labels:
     {{- include "dwmkerr-starter-kit.labels" $ | nindent 4 }}
+  annotations:
+    {{- if .dashboardIcon }}
+    ark.mckinsey.com/dashboard-icon: {{ .dashboardIcon | quote }}
+    {{- end }}
 spec:
   {{- if eq .model "default" }}
   # Uses default model configured in the system
