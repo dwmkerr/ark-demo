@@ -13,36 +13,35 @@ ANTHROPIC_API_KEY ?=
 GEMINI_API_KEY ?= 
 AZURE_OPENAI_API_KEY ?= 
 OPENAI_API_KEY ?=
+GITHUB_TOKEN ?=
 
 .PHONY: install
 install: # install the dwmkerr starter kit models to the cluster using Helm
 	./scripts/check-env.sh
-	# Phase 1: Install models and secrets only
+	# Phase 1: Install models and secrets only, disable GitHub agent
 	helm upgrade --install $(CHART_NAME) $(CHART_PATH) \
 		--values values.yaml \
 		--set agents=null --set teams=null \
-		--set models.anthropic.enabled=$(if $(ANTHROPIC_API_KEY),true,false) \
+		--set mcpServers.github.agent.enabled=false \
 		--set models.anthropic.apiKey="$(ANTHROPIC_API_KEY)" \
-		--set models.gemini.enabled=$(if $(GEMINI_API_KEY),true,false) \
 		--set models.gemini.apiKey="$(GEMINI_API_KEY)" \
-		--set models.azureOpenAI.enabled=$(if $(AZURE_OPENAI_API_KEY),true,false) \
 		--set models.azureOpenAI.apiKey="$(AZURE_OPENAI_API_KEY)" \
-		--set models.openai.enabled=$(if $(OPENAI_API_KEY),true,false) \
 		--set models.openai.apiKey="$(OPENAI_API_KEY)" \
+		--set mcpServers.github.githubToken="$(GITHUB_TOKEN)" \
 		--create-namespace \
 		--namespace $(NAMESPACE) \
 		--wait
-	# Phase 2: Add agents and teams (models already exist)
+	# Wait for MCP server to enumerate tools
+	@echo "Waiting 15 seconds for MCP server to create tools..."
+	@sleep 15
+	# Phase 2: Add agents and teams (models and tools now exist)
 	helm upgrade $(CHART_NAME) $(CHART_PATH) \
 		--values values.yaml \
-		--set models.anthropic.enabled=$(if $(ANTHROPIC_API_KEY),true,false) \
 		--set models.anthropic.apiKey="$(ANTHROPIC_API_KEY)" \
-		--set models.gemini.enabled=$(if $(GEMINI_API_KEY),true,false) \
 		--set models.gemini.apiKey="$(GEMINI_API_KEY)" \
-		--set models.azureOpenAI.enabled=$(if $(AZURE_OPENAI_API_KEY),true,false) \
 		--set models.azureOpenAI.apiKey="$(AZURE_OPENAI_API_KEY)" \
-		--set models.openai.enabled=$(if $(OPENAI_API_KEY),true,false) \
 		--set models.openai.apiKey="$(OPENAI_API_KEY)" \
+		--set mcpServers.github.githubToken="$(GITHUB_TOKEN)" \
 		--namespace $(NAMESPACE) \
 		--wait
 
@@ -59,11 +58,8 @@ status: # show deployment status
 template: # render chart templates to see what would be created
 	helm template $(CHART_NAME) $(CHART_PATH) \
 		--values values.yaml \
-		--set models.anthropic.enabled=$(if $(ANTHROPIC_API_KEY),true,false) \
 		--set models.anthropic.apiKey="$(ANTHROPIC_API_KEY)" \
-		--set models.gemini.enabled=$(if $(GEMINI_API_KEY),true,false) \
 		--set models.gemini.apiKey="$(GEMINI_API_KEY)" \
-		--set models.azureOpenAI.enabled=$(if $(AZURE_OPENAI_API_KEY),true,false) \
 		--set models.azureOpenAI.apiKey="$(AZURE_OPENAI_API_KEY)" \
-		--set models.openai.enabled=$(if $(OPENAI_API_KEY),true,false) \
-		--set models.openai.apiKey="$(OPENAI_API_KEY)"
+		--set models.openai.apiKey="$(OPENAI_API_KEY)" \
+		--set mcpServers.github.githubToken="$(GITHUB_TOKEN)"

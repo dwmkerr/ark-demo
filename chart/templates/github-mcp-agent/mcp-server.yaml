@@ -1,0 +1,39 @@
+{{- if .Values.mcpServers.github.enabled }}
+{{- $githubToken := .Values.mcpServers.github.githubToken }}
+{{- if not $githubToken }}
+{{- fail "GitHub MCP server is enabled but GITHUB_TOKEN environment variable is not set" }}
+{{- end }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: github-token
+  labels:
+    {{- include "dwmkerr-starter-kit.labels" . | nindent 4 }}
+type: Opaque
+data:
+  token: {{ $githubToken | b64enc }}
+---
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: MCPServer
+metadata:
+  name: github
+  labels:
+    {{- include "dwmkerr-starter-kit.labels" . | nindent 4 }}
+spec:
+  address:
+    value: "https://api.githubcopilot.com/mcp"
+  headers:
+    - name: "Authorization"
+      value:
+        valueFrom:
+          secretKeyRef:
+            name: github-token
+            key: token
+    - name: "User-Agent"
+      value:
+        value: "mckinsey-agent/1.0"
+  timeout: "30s"
+  transport: http
+  description: "Remote GitHub MCP server hosted by GitHub"
+{{- end }}
