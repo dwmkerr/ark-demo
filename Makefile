@@ -18,11 +18,9 @@ GITHUB_TOKEN ?=
 .PHONY: install
 install: # install the dwmkerr starter kit models to the cluster using Helm
 	./scripts/check-env.sh
-	# Phase 1: Install models and secrets only, disable GitHub agent
+	# Install everything in one step
 	helm upgrade --install $(CHART_NAME) $(CHART_PATH) \
 		--values values.yaml \
-		--set agents=null --set teams=null \
-		--set mcpServers.github.agent.enabled=false \
 		--set models.anthropic.apiKey="$(ANTHROPIC_API_KEY)" \
 		--set models.gemini.apiKey="$(GEMINI_API_KEY)" \
 		--set models.azureOpenAI.apiKey="$(AZURE_OPENAI_API_KEY)" \
@@ -31,23 +29,25 @@ install: # install the dwmkerr starter kit models to the cluster using Helm
 		--create-namespace \
 		--namespace $(NAMESPACE) \
 		--wait
-	# Wait for MCP server to enumerate tools
-	@echo "Waiting 15 seconds for MCP server to create tools..."
-	@sleep 15
-	# Phase 2: Add agents and teams (models and tools now exist)
-	helm upgrade $(CHART_NAME) $(CHART_PATH) \
-		--values values.yaml \
-		--set models.anthropic.apiKey="$(ANTHROPIC_API_KEY)" \
-		--set models.gemini.apiKey="$(GEMINI_API_KEY)" \
-		--set models.azureOpenAI.apiKey="$(AZURE_OPENAI_API_KEY)" \
-		--set models.openai.apiKey="$(OPENAI_API_KEY)" \
-		--set mcpServers.github.githubToken="$(GITHUB_TOKEN)" \
-		--namespace $(NAMESPACE) \
-		--wait
+
+.PHONY: install-all
+install-all: install # install all resources including internal tools
+	(cd /Users/Dave_Kerr/repos/github/McK-Internal/agents-at-scale-marketplace/services/lexi && make install)
+	(cd /Users/Dave_Kerr/repos/github/McK-Internal/agents-at-scale-marketplace/services/noah && make install)
+	(cd /Users/Dave_Kerr/repos/github/McK-Internal/agents-at-scale-marketplace/services/ark-agentcore-bridge && make install)
+	(cd /Users/Dave_Kerr/repos/github/McK-Internal/agents-at-scale-user && ./aasctl setup && ./aasctl push && ./aasctl up)
 
 .PHONY: uninstall
 uninstall: # remove the dwmkerr starter kit from the cluster
 	helm uninstall $(CHART_NAME) --namespace $(NAMESPACE) --ignore-not-found
+
+.PHONY: uninstall-all
+install-all: uninstall # install all resources including internal tools
+	(cd /Users/Dave_Kerr/repos/github/McK-Internal/agents-at-scale-marketplace/services/lexi && make uninstall)
+	(cd /Users/Dave_Kerr/repos/github/McK-Internal/agents-at-scale-marketplace/services/noah && make uninstall)
+	(cd /Users/Dave_Kerr/repos/github/McK-Internal/agents-at-scale-marketplace/services/ark-agentcore-bridge && make uninstall)
+	(cd /Users/Dave_Kerr/repos/github/McK-Internal/agents-at-scale-user && ./aasctl dowm)
+
 
 .PHONY: status
 status: # show deployment status

@@ -10,6 +10,8 @@ metadata:
   name: github-token
   labels:
     {{- include "dwmkerr-starter-kit.labels" . | nindent 4 }}
+  annotations:
+    ark.mckinsey.com/dashboard-icon: "/icons/github.png"
 type: Opaque
 data:
   token: {{ $githubToken | b64enc }}
@@ -20,6 +22,8 @@ metadata:
   name: github
   labels:
     {{- include "dwmkerr-starter-kit.labels" . | nindent 4 }}
+  annotations:
+    ark.mckinsey.com/dashboard-icon: "/icons/github.png"
 spec:
   address:
     value: "https://api.githubcopilot.com/mcp"
