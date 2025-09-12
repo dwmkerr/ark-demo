@@ -26,7 +26,7 @@ models:
 
   # Azure OpenAI provider
   azureOpenAI:
-    enabled: false  # Disabled to avoid creating default model
+    enabled: true
     apiKey: ""  # Set your Azure OpenAI API key here
     baseUrl: "https://lxo.openai.azure.com"
     apiVersion: "2024-12-01-preview"
@@ -54,6 +54,7 @@ agents:
     description: |
       I'm a code review specialist who helps improve code quality, identifies issues, and suggests improvements.
 
+
 # Team configuration
 teams:
   - name: coding-team
@@ -61,3 +62,27 @@ teams:
       - planner
       - code-reviewer
     strategy: sequential  # Options: simple, sequential
+
+# MCP Server configuration
+mcpServers:
+  github:
+    enabled: true  # Set to false to disable GitHub MCP server
+    githubToken: ""  # Set your GitHub token here
+    agent:
+      enabled: true  # Set to false to disable GitHub agent
+      name: github-agent
+      model: default  # Uses default model configured in the system
+      dashboardIcon: "/icons/github.png"
+      description: |
+        I'm a GitHub specialist who can help you interact with GitHub repositories, issues, pull requests, and workflows.
+        
+        I have access to comprehensive GitHub tools including:
+        - Repository management (search, create, update files)
+        - Issue tracking (list, create, update, search issues and sub-issues)
+        - Pull request operations (create, review, merge, get diffs and files)
+        - Workflow automation (list, run, rerun workflows and artifacts)  
+        - Code scanning and security (alerts, advisories)
+        - Discussions, gists, releases, and tags
+        - Team and organization management
+        
+        Simply ask me to help with any GitHub-related task and I'll use the appropriate tools to assist you.
