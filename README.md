@@ -46,3 +46,18 @@ Default configuration includes:
 - OpenAI: GPT models with API key from `OPENAI_API_KEY`
 
 Each provider is automatically enabled only if its corresponding environment variable is set.
+
+## Interactive Notebook
+
+The interactive Jupyter notebook demos ARK's OpenAI-compatible API:
+
+```bash
+pip install jupyterlab
+python -m jupyterlab notebooks/ark-openai-apis.ipynb
+```
+
+The notebook provides an interactive interface to:
+- Connect to your ARK deployment
+- List all available targets (models, agents, teams, tools)
+- Send messages and receive responses
+- Toggle between streaming and non-streaming modes
