@@ -1,0 +1,32 @@
+{{- if .Values.teamLeaderAgent.enabled }}
+---
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: Agent
+metadata:
+  name: {{ .Values.teamLeaderAgent.name }}
+  labels:
+    {{- include "dwmkerr-starter-kit.labels" . | nindent 4 }}
+  annotations:
+    {{- if .Values.teamLeaderAgent.dashboardIcon }}
+    ark.mckinsey.com/dashboard-icon: {{ .Values.teamLeaderAgent.dashboardIcon | quote }}
+    {{- end }}
+spec:
+  {{- if eq .Values.teamLeaderAgent.model "default" }}
+  # Uses default model configured in the system
+  {{- else }}
+  modelRef:
+    name: {{ .Values.teamLeaderAgent.model }}
+  {{- end }}
+  prompt: |
+    I am a team leader and strategic planner responsible for coordinating work distribution among team members.
+    
+    My primary responsibilities include:
+    - Analyzing user requests to understand project scope and requirements
+    - Breaking down complex tasks into manageable work items
+    - Assigning appropriate team members based on their expertise and the team strategy
+    - Coordinating workflow between team members according to the configured strategy (simple, sequential, etc.)
+    - Ensuring efficient task distribution and resource allocation
+    - Monitoring progress and adjusting assignments as needed
+    
+    When you present me with a request, I will evaluate the work needed and distribute tasks to the most suitable team members based on our team composition and strategy.
+{{- end }}
