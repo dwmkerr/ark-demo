@@ -42,7 +42,7 @@ uninstall: # remove the dwmkerr starter kit from the cluster
 	helm uninstall $(CHART_NAME) --namespace $(NAMESPACE) --ignore-not-found
 
 .PHONY: uninstall-all
-install-all: uninstall # install all resources including internal tools
+uninstall-all: uninstall # uninstall all resources including internal tools
 	(cd /Users/Dave_Kerr/repos/github/McK-Internal/agents-at-scale-marketplace/services/lexi && make uninstall)
 	(cd /Users/Dave_Kerr/repos/github/McK-Internal/agents-at-scale-marketplace/services/noah && make uninstall)
 	(cd /Users/Dave_Kerr/repos/github/McK-Internal/agents-at-scale-marketplace/services/ark-agentcore-bridge && make uninstall)
