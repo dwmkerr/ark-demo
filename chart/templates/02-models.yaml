@@ -104,3 +104,51 @@ spec:
             key: apiKey
 {{- end }}
 {{- end }}
+
+{{- if .Values.models.bedrock.enabled }}
+{{- range .Values.models.bedrock.models }}
+---
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: Model
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "dwmkerr-starter-kit.labels" $ | nindent 4 }}
+  annotations:
+    ark.mckinsey.com/dashboard-icon: "/icons/aws.png"
+spec:
+  type: bedrock
+  model:
+    value: {{ .model }}
+  config:
+    bedrock:
+      region:
+        value: {{ $.Values.models.bedrock.region | quote }}
+      {{- if $.Values.models.bedrock.endpointUrl }}
+      baseUrl:
+        value: {{ $.Values.models.bedrock.endpointUrl | quote }}
+      {{- end }}
+      accessKeyId:
+        valueFrom:
+          secretKeyRef:
+            name: dwmkerr-bedrock-secret
+            key: accessKeyId
+      secretAccessKey:
+        valueFrom:
+          secretKeyRef:
+            name: dwmkerr-bedrock-secret
+            key: secretAccessKey
+      {{- if $.Values.models.bedrock.sessionToken }}
+      sessionToken:
+        valueFrom:
+          secretKeyRef:
+            name: dwmkerr-bedrock-secret
+            key: sessionToken
+      {{- end }}
+      properties:
+        temperature:
+          value: {{ .temperature | quote }}
+        max_tokens:
+          value: {{ .maxTokens | quote }}
+{{- end }}
+{{- end }}

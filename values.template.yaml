@@ -40,6 +40,20 @@ models:
     baseUrl: "https://api.openai.com/v1/"
     models: []
 
+  # Amazon Bedrock provider - requires AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
+  bedrock:
+    enabled: false
+    accessKeyId: ""  # REQUIRED: Set your AWS Access Key ID
+    secretAccessKey: ""  # REQUIRED: Set your AWS Secret Access Key
+    sessionToken: ""  # OPTIONAL: Set your AWS Session Token for temporary credentials
+    region: "us-east-1"  # AWS region for Bedrock service
+    endpointUrl: ""  # Custom Bedrock endpoint URL (optional)
+    models:
+      - name: claude-haiku-bedrock
+        model: "us.anthropic.claude-3-5-haiku-20241022-v1:0"
+        temperature: "0.5"
+        maxTokens: "4096"
+
 
 # Agent configuration
 agents:
