@@ -67,3 +67,7 @@ The notebook provides an interactive interface to:
 - List all available targets (models, agents, teams, tools)
 - Send messages and receive responses
 - Toggle between streaming and non-streaming modes
+
+# TODO
+
+- agents as tools
