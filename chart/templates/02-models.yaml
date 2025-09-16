@@ -14,6 +14,8 @@ spec:
   type: openai
   model:
     value: {{ .model }}
+  # Low frequency refresh for stable providers to reduce API costs
+  refreshInterval: 4h
   config:
     openai:
       baseUrl:
@@ -41,6 +43,8 @@ spec:
   type: openai
   model:
     value: {{ .model }}
+  # Low frequency refresh for stable providers to reduce API costs
+  refreshInterval: 4h
   config:
     openai:
       baseUrl:
@@ -93,6 +97,8 @@ spec:
   type: openai
   model:
     value: {{ .model }}
+  # Low frequency refresh for stable providers to reduce API costs
+  refreshInterval: 4h
   config:
     openai:
       baseUrl:
@@ -120,6 +126,8 @@ spec:
   type: bedrock
   model:
     value: {{ .model }}
+  # Low frequency refresh for stable providers to reduce API costs
+  refreshInterval: 4h
   config:
     bedrock:
       region:
