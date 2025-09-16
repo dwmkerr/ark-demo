@@ -8,24 +8,13 @@ CHART_NAME := dwmkerr-starter-kit
 CHART_PATH := ./chart
 NAMESPACE ?= default
 
-# Environment variables for API keys
-ANTHROPIC_API_KEY ?= 
-GEMINI_API_KEY ?= 
-AZURE_OPENAI_API_KEY ?= 
-OPENAI_API_KEY ?=
-GITHUB_TOKEN ?=
-
 .PHONY: install
 install: # install the dwmkerr starter kit models to the cluster using Helm
+	@if [ ! -f values.yaml ]; then echo "Error: values.yaml not found. Run 'cp values.template.yaml values.yaml' and configure your API keys."; exit 1; fi
 	./scripts/check-env.sh
 	# Install everything in one step
 	helm upgrade --install $(CHART_NAME) $(CHART_PATH) \
 		--values values.yaml \
-		--set models.anthropic.apiKey="$(ANTHROPIC_API_KEY)" \
-		--set models.gemini.apiKey="$(GEMINI_API_KEY)" \
-		--set models.azureOpenAI.apiKey="$(AZURE_OPENAI_API_KEY)" \
-		--set models.openai.apiKey="$(OPENAI_API_KEY)" \
-		--set mcpServers.github.githubToken="$(GITHUB_TOKEN)" \
 		--create-namespace \
 		--namespace $(NAMESPACE) \
 		--wait
@@ -57,9 +46,4 @@ status: # show deployment status
 .PHONY: template
 template: # render chart templates to see what would be created
 	helm template $(CHART_NAME) $(CHART_PATH) \
-		--values values.yaml \
-		--set models.anthropic.apiKey="$(ANTHROPIC_API_KEY)" \
-		--set models.gemini.apiKey="$(GEMINI_API_KEY)" \
-		--set models.azureOpenAI.apiKey="$(AZURE_OPENAI_API_KEY)" \
-		--set models.openai.apiKey="$(OPENAI_API_KEY)" \
-		--set mcpServers.github.githubToken="$(GITHUB_TOKEN)"
+		--values values.yaml
