@@ -8,24 +8,13 @@ CHART_NAME := dwmkerr-starter-kit
 CHART_PATH := ./chart
 NAMESPACE ?= default
 
-# Environment variables for API keys
-ANTHROPIC_API_KEY ?= 
-GEMINI_API_KEY ?= 
-AZURE_OPENAI_API_KEY ?= 
-OPENAI_API_KEY ?=
-GITHUB_TOKEN ?=
-
 .PHONY: install
 install: # install the dwmkerr starter kit models to the cluster using Helm
+	@if [ ! -f values.yaml ]; then echo "Error: values.yaml not found. Run 'cp values.template.yaml values.yaml' and configure your API keys."; exit 1; fi
 	./scripts/check-env.sh
 	# Install everything in one step
 	helm upgrade --install $(CHART_NAME) $(CHART_PATH) \
 		--values values.yaml \
-		--set models.anthropic.apiKey="$(ANTHROPIC_API_KEY)" \
-		--set models.gemini.apiKey="$(GEMINI_API_KEY)" \
-		--set models.azureOpenAI.apiKey="$(AZURE_OPENAI_API_KEY)" \
-		--set models.openai.apiKey="$(OPENAI_API_KEY)" \
-		--set mcpServers.github.githubToken="$(GITHUB_TOKEN)" \
 		--create-namespace \
 		--namespace $(NAMESPACE) \
 		--wait
@@ -42,7 +31,7 @@ uninstall: # remove the dwmkerr starter kit from the cluster
 	helm uninstall $(CHART_NAME) --namespace $(NAMESPACE) --ignore-not-found
 
 .PHONY: uninstall-all
-install-all: uninstall # install all resources including internal tools
+uninstall-all: uninstall # uninstall all resources including internal tools
 	(cd /Users/Dave_Kerr/repos/github/McK-Internal/agents-at-scale-marketplace/services/lexi && make uninstall)
 	(cd /Users/Dave_Kerr/repos/github/McK-Internal/agents-at-scale-marketplace/services/noah && make uninstall)
 	(cd /Users/Dave_Kerr/repos/github/McK-Internal/agents-at-scale-marketplace/services/ark-agentcore-bridge && make uninstall)
@@ -57,9 +46,4 @@ status: # show deployment status
 .PHONY: template
 template: # render chart templates to see what would be created
 	helm template $(CHART_NAME) $(CHART_PATH) \
-		--values values.yaml \
-		--set models.anthropic.apiKey="$(ANTHROPIC_API_KEY)" \
-		--set models.gemini.apiKey="$(GEMINI_API_KEY)" \
-		--set models.azureOpenAI.apiKey="$(AZURE_OPENAI_API_KEY)" \
-		--set models.openai.apiKey="$(OPENAI_API_KEY)" \
-		--set mcpServers.github.githubToken="$(GITHUB_TOKEN)"
+		--values values.yaml
