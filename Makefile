@@ -11,7 +11,6 @@ NAMESPACE ?= default
 .PHONY: install
 install: # install the dwmkerr starter kit models to the cluster using Helm
 	@if [ ! -f values.yaml ]; then echo "Error: values.yaml not found. Run 'cp values.template.yaml values.yaml' and configure your API keys."; exit 1; fi
-	./scripts/check-env.sh
 	# Install everything in one step
 	helm upgrade --install $(CHART_NAME) $(CHART_PATH) \
 		--values values.yaml \

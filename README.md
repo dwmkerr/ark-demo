@@ -53,20 +53,16 @@ Default configuration includes:
 
 Each provider is automatically enabled only if its corresponding environment variable is set.
 
-## Interactive Notebook
-
-The interactive Jupyter notebook demos ARK's OpenAI-compatible API:
+## Interactive Notebooks
 
 ```bash
 pip install jupyterlab
-python -m jupyterlab notebooks/ark-openai-apis.ipynb
 ```
 
-The notebook provides an interactive interface to:
-- Connect to your ARK deployment
-- List all available targets (models, agents, teams, tools)
-- Send messages and receive responses
-- Toggle between streaming and non-streaming modes
+| Command | Description |
+|---------|-------------|
+| `python -m jupyterlab notebooks/ark-openai-apis-basic.ipynb` | Simple non-interactive demo showing basic ARK OpenAI API usage |
+| `python -m jupyterlab notebooks/ark-openai-apis.ipynb` | Interactive interface with widgets for target selection and streaming modes |
 
 # TODO
 
