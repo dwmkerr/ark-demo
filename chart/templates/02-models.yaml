@@ -14,8 +14,8 @@ spec:
   type: openai
   model:
     value: {{ .model }}
-  # Low frequency refresh for stable providers to reduce API costs
-  refreshInterval: 4h
+  # Regular refresh interval for model availability checks
+  pollInterval: 1m
   config:
     openai:
       baseUrl:
@@ -43,8 +43,8 @@ spec:
   type: openai
   model:
     value: {{ .model }}
-  # Low frequency refresh for stable providers to reduce API costs
-  refreshInterval: 4h
+  # Regular refresh interval for model availability checks
+  pollInterval: 1m
   config:
     openai:
       baseUrl:
@@ -70,6 +70,8 @@ spec:
   type: azure
   model:
     value: {{ .model }}
+  # Regular refresh interval for model availability checks
+  pollInterval: 1m
   config:
     azure:
       baseUrl:
@@ -97,8 +99,8 @@ spec:
   type: openai
   model:
     value: {{ .model }}
-  # Low frequency refresh for stable providers to reduce API costs
-  refreshInterval: 4h
+  # Regular refresh interval for model availability checks
+  pollInterval: 1m
   config:
     openai:
       baseUrl:
@@ -126,8 +128,8 @@ spec:
   type: bedrock
   model:
     value: {{ .model }}
-  # Low frequency refresh for stable providers to reduce API costs
-  refreshInterval: 4h
+  # Regular refresh interval for model availability checks
+  pollInterval: 1m
   config:
     bedrock:
       region:
