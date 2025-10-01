@@ -86,11 +86,11 @@ spec:
       type: custom
     - name: github-get-pull-request
       type: custom
-    - name: github-get-pull-request-comments
-      type: custom
     - name: github-get-pull-request-diff
       type: custom
     - name: github-get-pull-request-files
+      type: custom
+    - name: github-get-pull-request-review-comments
       type: custom
     - name: github-get-pull-request-reviews
       type: custom
@@ -144,6 +144,8 @@ spec:
       type: custom
     - name: github-list-secret-scanning-alerts
       type: custom
+    - name: github-list-starred-repositories
+      type: custom
     - name: github-list-sub-issues
       type: custom
     - name: github-list-tags
@@ -190,7 +192,11 @@ spec:
       type: custom
     - name: github-search-users
       type: custom
+    - name: github-star-repository
+      type: custom
     - name: github-submit-pending-pull-request-review
+      type: custom
+    - name: github-unstar-repository
       type: custom
     - name: github-update-gist
       type: custom
