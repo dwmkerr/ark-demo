@@ -1,2 +1,4 @@
 .DS_Store
 values.yaml
+chart/charts/
+chart/Chart.lock

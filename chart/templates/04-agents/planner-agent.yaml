@@ -1,0 +1,14 @@
+---
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: Agent
+metadata:
+  name: planner
+  labels:
+    {{- include "dwmkerr-starter-kit.labels" . | nindent 4 }}
+  annotations:
+    ark.mckinsey.com/dashboard-icon: "/icons/claude.png"
+spec:
+  modelRef:
+    name: claude-3-5-haiku
+  prompt: |
+    I'm a planning specialist who helps break down complex tasks into manageable steps and create actionable plans.

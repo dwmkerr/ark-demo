@@ -55,56 +55,12 @@ models:
         maxTokens: "4096"
 
 
-# Agent configuration
-agents:
-  - name: planner
-    model: claude-3-5-haiku  # Use Anthropic's Claude Haiku instead of default
-    dashboardIcon: "/icons/claude.png"
-    description: |
-      I'm a planning specialist who helps break down complex tasks into manageable steps and create actionable plans.
-  
-  - name: code-reviewer
-    model: claude-4-opus  # Use Anthropic's Claude 4 Opus for advanced code review
-    dashboardIcon: "/icons/claude.png"
-    description: |
-      I'm a code review specialist who helps improve code quality, identifies issues, and suggests improvements.
-
-
-# Team Leader Agent configuration
-teamLeaderAgent:
-  enabled: true  # Set to false to disable team leader agent
-  name: team-leader
-  model: default  # Uses default model configured in the system
-  dashboardIcon: "/icons/team.png"
-
-# Team configuration
-teams:
-  - name: coding-team
-    members:
-      - planner
-      - code-reviewer
-    strategy: sequential  # Options: simple, sequential
-
 # MCP Server configuration
 mcpServers:
   github:
     enabled: true  # Set to false to disable GitHub MCP server
     githubToken: ""  # REQUIRED: Set your GitHub token (ghp_...) for GitHub integration
-    agent:
-      enabled: true  # Set to false to disable GitHub agent
-      name: github-agent
-      model: default  # Uses default model configured in the system
-      dashboardIcon: "/icons/github.png"
-      description: |
-        I'm a GitHub specialist who can help you interact with GitHub repositories, issues, pull requests, and workflows.
-        
-        I have access to comprehensive GitHub tools including:
-        - Repository management (search, create, update files)
-        - Issue tracking (list, create, update, search issues and sub-issues)
-        - Pull request operations (create, review, merge, get diffs and files)
-        - Workflow automation (list, run, rerun workflows and artifacts)  
-        - Code scanning and security (alerts, advisories)
-        - Discussions, gists, releases, and tags
-        - Team and organization management
-        
-        Simply ask me to help with any GitHub-related task and I'll use the appropriate tools to assist you.
+
+  # Optional: AI Developer Guide MCP server
+  aiDeveloperGuide:
+    enabled: true  # Set to false to disable AI Developer Guide MCP server (requires helm dependency update)

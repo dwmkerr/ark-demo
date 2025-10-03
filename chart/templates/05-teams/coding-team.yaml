@@ -1,0 +1,14 @@
+---
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: Team
+metadata:
+  name: coding-team
+  labels:
+    {{- include "dwmkerr-starter-kit.labels" . | nindent 4 }}
+spec:
+  members:
+    - name: planner
+      type: agent
+    - name: code-reviewer
+      type: agent
+  strategy: "sequential"

@@ -66,6 +66,8 @@ metadata:
   name: {{ .name }}
   labels:
     {{- include "dwmkerr-starter-kit.labels" $ | nindent 4 }}
+  annotations:
+    ark.mckinsey.com/dashboard-icon: "/icons/azure.png"
 spec:
   type: azure
   model:
@@ -95,6 +97,8 @@ metadata:
   name: {{ .name }}
   labels:
     {{- include "dwmkerr-starter-kit.labels" $ | nindent 4 }}
+  annotations:
+    ark.mckinsey.com/dashboard-icon: "/icons/openai-blue.png"
 spec:
   type: openai
   model:
