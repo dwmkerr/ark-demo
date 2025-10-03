@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/dwmkerr/dwmkerr-ark-demo/compare/v0.1.1...v0.1.2) (2025-10-03)
+
+
+### Bug Fixes
+
+* update helm dependencies before packaging in cicd ([8481834](https://github.com/dwmkerr/dwmkerr-ark-demo/commit/8481834c6996795244277860c6d2b8b36aa30ac8))
+
 ## [0.1.1](https://github.com/dwmkerr/dwmkerr-ark-demo/compare/v0.1.0...v0.1.1) (2025-10-03)
 
 
