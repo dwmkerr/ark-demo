@@ -1,22 +1,15 @@
-{{- if and .Values.mcpServers.github.enabled .Values.mcpServers.github.agent.enabled }}
+{{- if .Values.mcpServers.github.enabled }}
 ---
 apiVersion: ark.mckinsey.com/v1alpha1
 kind: Agent
 metadata:
-  name: {{ .Values.mcpServers.github.agent.name }}
+  name: github-agent
   labels:
     {{- include "dwmkerr-starter-kit.labels" . | nindent 4 }}
   annotations:
-    {{- if .Values.mcpServers.github.agent.dashboardIcon }}
-    ark.mckinsey.com/dashboard-icon: {{ .Values.mcpServers.github.agent.dashboardIcon | quote }}
-    {{- end }}
+    ark.mckinsey.com/dashboard-icon: "/icons/github.png"
 spec:
-  {{- if eq .Values.mcpServers.github.agent.model "default" }}
   # Uses default model configured in the system
-  {{- else }}
-  modelRef:
-    name: {{ .Values.mcpServers.github.agent.model }}
-  {{- end }}
   tools:
     - name: github-add-comment-to-pending-review
       type: custom
@@ -207,5 +200,16 @@ spec:
     - name: github-update-pull-request-branch
       type: custom
   prompt: |
-{{ .Values.mcpServers.github.agent.description | nindent 4 }}
+    I'm a GitHub specialist who can help you interact with GitHub repositories, issues, pull requests, and workflows.
+
+    I have access to comprehensive GitHub tools including:
+    - Repository management (search, create, update files)
+    - Issue tracking (list, create, update, search issues and sub-issues)
+    - Pull request operations (create, review, merge, get diffs and files)
+    - Workflow automation (list, run, rerun workflows and artifacts)
+    - Code scanning and security (alerts, advisories)
+    - Discussions, gists, releases, and tags
+    - Team and organization management
+
+    Simply ask me to help with any GitHub-related task and I'll use the appropriate tools to assist you.
 {{- end }}

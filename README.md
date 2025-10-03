@@ -4,6 +4,16 @@ A Helm chart for deploying model configurations to Ark for demo purposes.
 
 ## Quickstart
 
+Install via Helm:
+
+```bash
+helm upgrade --install dwmkerr-starter-kit oci://ghcr.io/dwmkerr/charts/dwmkerr-starter-kit \
+    --set models.anthropic.apiKey="your-key" \
+    --set models.gemini.apiKey="your-key"
+```
+
+Or install locally:
+
 ```bash
 cp values.template.yaml values.yaml
 # Edit values.yaml with your API keys
@@ -52,6 +62,16 @@ Default configuration includes:
 - OpenAI: GPT models with API key from `OPENAI_API_KEY`
 
 Each provider is automatically enabled only if its corresponding environment variable is set.
+
+## Optional MCP Servers
+
+Optional MCP servers can be enabled via Helm dependencies:
+
+| Name | Values Field |
+|------|-------------|
+| [AI Developer Guide](https://github.com/dwmkerr/ai-developer-guide) | `mcpServers.aiDeveloperGuide.enabled` |
+
+Set to `true` in `values.yaml` and run `make install` (dependencies update automatically).
 
 ## Interactive Notebooks
 
