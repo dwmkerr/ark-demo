@@ -50,6 +50,9 @@ jobs:
           VERSION=${{ needs.release.outputs.tag }}
           echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
 
+      - name: Update Helm dependencies
+        run: helm dependency update ./chart
+
       - name: Package and push Helm chart
         run: |
           helm package ./chart
