@@ -6,8 +6,10 @@ version: 0.1.1
 appVersion: 0.1.1
 annotations:
   ark.mckinsey.com/service: dwmkerr-starter-kit
+
+# Optional MCP server dependencies
 dependencies:
   - name: ai-developer-guide-mcp
-    version: '>=0.1.0'
-    repository: oci://ghcr.io/dwmkerr/charts
+    version: ">=0.1.0"
+    repository: "oci://ghcr.io/dwmkerr/charts"
     condition: mcpServers.aiDeveloperGuide.enabled
