@@ -1,0 +1,30 @@
+{"level":"info","msg":"Inject devspacehelper...","time":"2025-10-07T13:38:06+01:00"}
+{"level":"info","msg":"Successfully injected devspacehelper into pod default/shell-devspace-64468c6bbc-c5zkz","time":"2025-10-07T13:38:09+01:00"}
+{"level":"info","msg":"Start syncing","time":"2025-10-07T13:38:09+01:00"}
+{"level":"info","msg":"Downstream - Initial sync completed","time":"2025-10-07T13:38:09+01:00"}
+{"level":"info","msg":"Upstream - Upload 4 create change(s) (Uncompressed ~4.05 KB)","time":"2025-10-07T13:38:10+01:00"}
+{"level":"info","msg":"Upstream - Successfully processed 4 change(s)","time":"2025-10-07T13:38:10+01:00"}
+{"level":"info","msg":"Upstream - Initial sync completed","time":"2025-10-07T13:38:11+01:00"}
+{"level":"info","msg":"Upstream - Upload File 'server.py'","time":"2025-10-07T13:42:57+01:00"}
+{"level":"info","msg":"Upstream - Upload 1 create change(s) (Uncompressed ~3.59 KB)","time":"2025-10-07T13:42:57+01:00"}
+{"level":"info","msg":"Upstream - Successfully processed 1 change(s)","time":"2025-10-07T13:42:57+01:00"}
+{"level":"info","msg":"Start syncing","time":"2025-10-07T13:43:09+01:00"}
+{"level":"info","msg":"Downstream - Initial sync completed","time":"2025-10-07T13:43:09+01:00"}
+{"level":"info","msg":"Upstream - Initial sync completed","time":"2025-10-07T13:43:10+01:00"}
+{"level":"info","msg":"Upstream - Upload File 'server.py'","time":"2025-10-07T14:01:40+01:00"}
+{"level":"info","msg":"Upstream - Upload 1 create change(s) (Uncompressed ~3.61 KB)","time":"2025-10-07T14:01:40+01:00"}
+{"level":"info","msg":"Upstream - Successfully processed 1 change(s)","time":"2025-10-07T14:01:40+01:00"}
+{"level":"info","msg":"Inject devspacehelper...","time":"2025-10-07T14:02:38+01:00"}
+{"level":"info","msg":"Successfully injected devspacehelper into pod default/shell-devspace-64468c6bbc-n4b8c","time":"2025-10-07T14:02:41+01:00"}
+{"level":"info","msg":"Start syncing","time":"2025-10-07T14:02:41+01:00"}
+{"level":"info","msg":"Downstream - Initial sync completed","time":"2025-10-07T14:02:41+01:00"}
+{"level":"info","msg":"Upstream - Upload 4 create change(s) (Uncompressed ~4.07 KB)","time":"2025-10-07T14:02:42+01:00"}
+{"level":"info","msg":"Upstream - Successfully processed 4 change(s)","time":"2025-10-07T14:02:42+01:00"}
+{"level":"info","msg":"Upstream - Initial sync completed","time":"2025-10-07T14:02:43+01:00"}
+{"level":"info","msg":"Inject devspacehelper...","time":"2025-10-07T14:05:11+01:00"}
+{"level":"info","msg":"Successfully injected devspacehelper into pod default/shell-devspace-64468c6bbc-d24rt","time":"2025-10-07T14:05:13+01:00"}
+{"level":"info","msg":"Start syncing","time":"2025-10-07T14:05:13+01:00"}
+{"level":"info","msg":"Downstream - Initial sync completed","time":"2025-10-07T14:05:13+01:00"}
+{"level":"info","msg":"Upstream - Upload 4 create change(s) (Uncompressed ~4.08 KB)","time":"2025-10-07T14:05:15+01:00"}
+{"level":"info","msg":"Upstream - Successfully processed 4 change(s)","time":"2025-10-07T14:05:15+01:00"}
+{"level":"info","msg":"Upstream - Initial sync completed","time":"2025-10-07T14:05:16+01:00"}

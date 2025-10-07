@@ -1,0 +1,42 @@
+version: v2beta1
+name: shell-mcp-server
+
+images:
+  shell-mcp-server:
+    image: shell-mcp-server
+    dockerfile: ./server/Dockerfile
+    context: ./server
+
+pipelines:
+  deploy: |-
+    build_images --all
+    create_deployments --all
+  dev: |-
+    create_deployments --all
+    start_dev --all
+
+deployments:
+  shell:
+    helm:
+      chart:
+        path: ./chart
+      values:
+        image:
+          repository: ${runtime.images.shell-mcp-server.image}
+          tag: ${runtime.images.shell-mcp-server.tag}
+
+dev:
+  shell:
+    imageSelector: shell-mcp-server
+    devImage: python:3.11-alpine
+    command: ["sh", "-c", "cd /app && apk add --no-cache bash git curl wget sed grep findutils github-cli && pip install --no-cache-dir -r requirements.txt && python server.py"]
+    namespace: default
+    logs:
+      lastLines: 50
+    sync:
+      - path: ./server:/app
+        startContainer: true
+        disableDownload: true
+        uploadExcludeFile: .dockerignore
+    ssh:
+      enabled: true

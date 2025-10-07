@@ -1,0 +1,10 @@
+images:
+    shell-mcp-server:
+        imageConfigHash: b21b6830615b339d74504ded21d8aaa68d8dec5572a146d1d3591e81c3794f46
+        dockerfileHash: 3737af41e90e24f51d8ca4098b02663abef0719882e76d7f6eb62c1a679e6ab0
+        contextHash: a8f58e8949a30cd30e12a24bbf1de8ca9b14b4a065d919175addef203eb2d2c6
+        imageName: shell-mcp-server
+        tag: TVsoJgY
+lastContext:
+    namespace: default
+    context: minikube

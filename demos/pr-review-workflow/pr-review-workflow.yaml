@@ -1,0 +1,578 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: pr-review-workflow
+  annotations:
+    workflows.argoproj.io/title: "Pull Requests Review"
+    workflows.argoproj.io/description: |
+      Analyzes all open pull requests in a GitHub repository.
+
+      For each PR:
+      1. Checks out the PR branch
+      2. Calls an ARK agent to analyze changes
+      3. Generates review guidance
+
+      Finally, creates a summary report of all PRs.
+spec:
+  entrypoint: main
+  # Run as 'argo-workflow' which has been assigned the 'ark-tenant'
+  # permissions, allowing it to access Ark resources.
+  serviceAccountName: argo-workflow
+
+  arguments:
+    parameters:
+    - name: github-org
+      value: "dwmkerr"
+      description: "GitHub organization name"
+
+    - name: github-repo
+      value: "example-repo"
+      description: "GitHub repository name"
+
+    - name: workspace-pvc-name
+      value: "github-mcp-workspace"
+      description: "Name of the PVC to use for workspace and attach to GitHub MCP"
+
+    - name: pr-analysis-agent
+      value: "code-review-agent"
+      description: "ARK agent name for analyzing individual PRs"
+
+    - name: pr-analysis-message
+      value: "Analyse the changes in this repo and summarise with a short description, the key changes, and advice for the code reviewer to focus on"
+      description: "Message to send to PR analysis agent"
+
+    - name: summary-agent
+      value: "summary-agent"
+      description: "ARK agent name for creating final summary report"
+
+    - name: summary-message
+      value: "Create a concise markdown report summarizing all pull request analyses. Include PR title, key changes, and review focus areas for each PR."
+      description: "Message to send to summary agent"
+
+  onExit: cleanup
+
+  volumeClaimTemplates:
+  - metadata:
+      name: workspace
+    spec:
+      accessModes: [ReadWriteOnce]
+      resources:
+        requests:
+          storage: 5Gi
+
+  templates:
+  - name: main
+    dag:
+      tasks:
+      - name: prepare
+        template: prepare-environment
+
+      - name: clone-repo
+        template: git-clone
+        dependencies: [prepare]
+
+      - name: list-pull-requests
+        template: list-prs
+        dependencies: [clone-repo]
+
+      - name: analyze-prs
+        template: analyze-pr
+        dependencies: [list-pull-requests]
+        arguments:
+          parameters:
+          - name: pr-number
+            value: "{{item}}"
+        withParam: "{{tasks.list-pull-requests.outputs.result}}"
+
+      - name: create-summary
+        template: summarize-all-prs
+        dependencies: [analyze-prs]
+        arguments:
+          parameters:
+          - name: pr-analyses
+            value: "{{tasks.analyze-prs.outputs.parameters}}"
+
+  - name: prepare-environment
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Verify PVC exists and GitHub MCP server is healthy"
+    script:
+      image: bitnami/kubectl:latest
+      command: [bash]
+      source: |
+        # Fail fast.
+        set -e -o pipefail
+
+        # Check the PVC.
+        pvc_name="{{workflow.parameters.workspace-pvc-name}}"
+        echo "checking workflow pvc '${pvc_name}'..."
+        if ! kubectl get pvc "${pvc_name}"; then
+          echo "error: pvc '${pvc_name}' not found"
+          exit 1
+        fi
+
+        # Check required MCP servers.
+        mcp_servers="github shell"
+        for mcp_server in ${mcp_servers}; do
+          echo "checking mcp server '${mcp_server}'..."
+          if ! kubectl get mcpserver "${mcp_server}"; then
+            echo "error: mcpserver '${mcp_server}' not found"
+            exit 1
+          fi
+        done
+
+  - name: git-clone
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Clone the repository to workspace"
+    container:
+      image: alpine/git:latest
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
+      command: [sh, -c]
+      args:
+      - |
+        set -e
+        echo "Cloning https://github.com/{{workflow.parameters.github-org}}/{{workflow.parameters.github-repo}}"
+
+        # Create workspace directory for this workflow
+        mkdir -p /workspace/{{workflow.uid}}
+        cd /workspace/{{workflow.uid}}
+
+        # Clone the repository
+        git clone https://github.com/{{workflow.parameters.github-org}}/{{workflow.parameters.github-repo}}.git repo
+
+        echo "Repository cloned successfully"
+
+  - name: list-prs
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "List all open pull requests using gh CLI"
+    container:
+      image: ghcr.io/cli/cli:latest
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
+      env:
+      - name: GH_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: github-token
+            key: token
+      command: [sh, -c]
+      args:
+      - |
+        set -e
+        cd /workspace/{{workflow.uid}}/repo
+
+        echo "Fetching open pull requests..."
+
+        # Get PR numbers as JSON array
+        gh pr list --state open --json number --jq '[.[].number]' > /tmp/pr-numbers.json
+
+        # Output the array for withParam
+        cat /tmp/pr-numbers.json
+    outputs:
+      result: /tmp/pr-numbers.json
+
+  - name: analyze-pr
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Analyze a single pull request"
+    inputs:
+      parameters:
+      - name: pr-number
+    dag:
+      tasks:
+      - name: checkout-pr
+        template: checkout-pr-branch
+        arguments:
+          parameters:
+          - name: pr-number
+            value: "{{inputs.parameters.pr-number}}"
+
+      - name: query-agent
+        template: create-analysis-query
+        dependencies: [checkout-pr]
+        arguments:
+          parameters:
+          - name: pr-number
+            value: "{{inputs.parameters.pr-number}}"
+
+      - name: wait-for-query
+        template: wait-for-query-completion
+        dependencies: [query-agent]
+        arguments:
+          parameters:
+          - name: query-name
+            value: "{{tasks.query-agent.outputs.parameters.query-name}}"
+
+      - name: get-analysis
+        template: get-query-result
+        dependencies: [wait-for-query]
+        arguments:
+          parameters:
+          - name: query-name
+            value: "{{tasks.query-agent.outputs.parameters.query-name}}"
+          - name: pr-number
+            value: "{{inputs.parameters.pr-number}}"
+    outputs:
+      parameters:
+      - name: pr-number
+        valueFrom:
+          parameter: "{{inputs.parameters.pr-number}}"
+      - name: analysis
+        valueFrom:
+          parameter: "{{tasks.get-analysis.outputs.parameters.analysis}}"
+
+  - name: checkout-pr-branch
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Checkout PR branch"
+    inputs:
+      parameters:
+      - name: pr-number
+    container:
+      image: ghcr.io/cli/cli:latest
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
+      env:
+      - name: GH_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: github-token
+            key: token
+      command: [sh, -c]
+      args:
+      - |
+        set -e
+        cd /workspace/{{workflow.uid}}/repo
+
+        echo "Checking out PR #{{inputs.parameters.pr-number}}"
+
+        # Fetch and checkout the PR
+        gh pr checkout {{inputs.parameters.pr-number}}
+
+        echo "PR #{{inputs.parameters.pr-number}} checked out successfully"
+
+  - name: create-analysis-query
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Create ARK query to analyze PR"
+    inputs:
+      parameters:
+      - name: pr-number
+    resource:
+      action: create
+      manifest: |
+        apiVersion: ark.mckinsey.com/v1alpha1
+        kind: Query
+        metadata:
+          generateName: pr-analysis-{{inputs.parameters.pr-number}}-
+          namespace: default
+        spec:
+          input: |
+            You are analyzing pull request #{{inputs.parameters.pr-number}} in the repository located at: {{workflow.uid}}/repo
+
+            When using filesystem tools, use paths starting with: {{workflow.uid}}/repo
+
+            {{workflow.parameters.pr-analysis-message}}
+
+          targets:
+          - type: agent
+            name: {{workflow.parameters.pr-analysis-agent}}
+
+          timeout: 10m
+    outputs:
+      parameters:
+      - name: query-name
+        valueFrom:
+          jsonPath: '{.metadata.name}'
+
+  - name: wait-for-query-completion
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Wait for query to complete"
+    inputs:
+      parameters:
+      - name: query-name
+    script:
+      image: bitnami/kubectl:latest
+      command: [bash]
+      source: |
+        set -e
+
+        QUERY_NAME="{{inputs.parameters.query-name}}"
+        NAMESPACE="default"
+
+        echo "Waiting for query $QUERY_NAME to complete..."
+
+        # Wait for query to reach a terminal state (done, error, or canceled)
+        while true; do
+          PHASE=$(kubectl get query "$QUERY_NAME" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "unknown")
+
+          echo "Current phase: $PHASE"
+
+          case "$PHASE" in
+            done)
+              echo "Query completed successfully"
+              exit 0
+              ;;
+            error)
+              echo "Query failed with error"
+              kubectl get query "$QUERY_NAME" -n "$NAMESPACE" -o yaml
+              exit 1
+              ;;
+            canceled)
+              echo "Query was canceled"
+              exit 1
+              ;;
+            pending|running)
+              echo "Query still running, waiting..."
+              sleep 5
+              ;;
+            *)
+              echo "Unknown phase: $PHASE, waiting..."
+              sleep 5
+              ;;
+          esac
+        done
+
+  - name: get-query-result
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Extract query result"
+    inputs:
+      parameters:
+      - name: query-name
+      - name: pr-number
+    script:
+      image: bitnami/kubectl:latest
+      command: [bash]
+      source: |
+        set -e
+
+        QUERY_NAME="{{inputs.parameters.query-name}}"
+        NAMESPACE="default"
+
+        echo "Extracting result from query $QUERY_NAME"
+
+        # Get the response content
+        CONTENT=$(kubectl get query "$QUERY_NAME" -n "$NAMESPACE" \
+          -o jsonpath='{.status.responses[0].content}' 2>/dev/null || echo "No response found")
+
+        # Save to output file
+        echo "=== PR #{{inputs.parameters.pr-number}} Analysis ===" > /tmp/analysis.txt
+        echo "$CONTENT" >> /tmp/analysis.txt
+
+        cat /tmp/analysis.txt
+    outputs:
+      parameters:
+      - name: analysis
+        valueFrom:
+          path: /tmp/analysis.txt
+
+  - name: summarize-all-prs
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Create summary report of all PR analyses"
+    inputs:
+      parameters:
+      - name: pr-analyses
+    dag:
+      tasks:
+      - name: aggregate-analyses
+        template: aggregate-pr-analyses
+        arguments:
+          parameters:
+          - name: pr-analyses
+            value: "{{inputs.parameters.pr-analyses}}"
+
+      - name: create-summary-query
+        template: create-summary-query
+        dependencies: [aggregate-analyses]
+        arguments:
+          parameters:
+          - name: aggregated-analyses
+            value: "{{tasks.aggregate-analyses.outputs.parameters.aggregated}}"
+
+      - name: wait-for-summary
+        template: wait-for-query-completion
+        dependencies: [create-summary-query]
+        arguments:
+          parameters:
+          - name: query-name
+            value: "{{tasks.create-summary-query.outputs.parameters.query-name}}"
+
+      - name: get-summary
+        template: get-final-summary
+        dependencies: [wait-for-summary]
+        arguments:
+          parameters:
+          - name: query-name
+            value: "{{tasks.create-summary-query.outputs.parameters.query-name}}"
+
+      - name: save-report
+        template: save-summary-report
+        dependencies: [get-summary]
+        arguments:
+          parameters:
+          - name: summary
+            value: "{{tasks.get-summary.outputs.parameters.summary}}"
+
+  - name: aggregate-pr-analyses
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Aggregate all PR analyses into single document"
+    inputs:
+      parameters:
+      - name: pr-analyses
+    script:
+      image: python:3.11-alpine
+      command: [python]
+      source: |
+        import json
+
+        # Parse the analyses parameter (JSON array from withParam outputs)
+        analyses_json = '''{{inputs.parameters.pr-analyses}}'''
+
+        # The parameter will be a JSON object with keys like "analyze-prs-0", "analyze-prs-1", etc.
+        # Each containing pr-number and analysis
+        try:
+            analyses_dict = json.loads(analyses_json)
+        except:
+            print("No analyses found or invalid JSON")
+            print("[]")
+            exit(0)
+
+        # Build aggregated text
+        aggregated = []
+        for task_key, params in analyses_dict.items():
+            if 'pr-number' in params and 'analysis' in params:
+                aggregated.append(f"### Pull Request #{params['pr-number']}\n\n{params['analysis']}\n\n---\n")
+
+        result = "\n".join(aggregated)
+        print(result)
+    outputs:
+      parameters:
+      - name: aggregated
+        valueFrom:
+          path: /dev/stdout
+
+  - name: create-summary-query
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Create query for final summary"
+    inputs:
+      parameters:
+      - name: aggregated-analyses
+    resource:
+      action: create
+      manifest: |
+        apiVersion: ark.mckinsey.com/v1alpha1
+        kind: Query
+        metadata:
+          generateName: pr-summary-
+          namespace: default
+        spec:
+          input: |
+            {{workflow.parameters.summary-message}}
+
+            Here are the analyses of all pull requests:
+
+            {{inputs.parameters.aggregated-analyses}}
+
+          targets:
+          - type: agent
+            name: {{workflow.parameters.summary-agent}}
+
+          timeout: 10m
+    outputs:
+      parameters:
+      - name: query-name
+        valueFrom:
+          jsonPath: '{.metadata.name}'
+
+  - name: get-final-summary
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Extract final summary"
+    inputs:
+      parameters:
+      - name: query-name
+    script:
+      image: bitnami/kubectl:latest
+      command: [bash]
+      source: |
+        set -e
+
+        QUERY_NAME="{{inputs.parameters.query-name}}"
+
+        # Get the summary
+        kubectl get query "$QUERY_NAME" -n default \
+          -o jsonpath='{.status.responses[0].content}' > /tmp/summary.md
+
+        echo "=== Pull Request Summary Report ==="
+        cat /tmp/summary.md
+    outputs:
+      parameters:
+      - name: summary
+        valueFrom:
+          path: /tmp/summary.md
+
+  - name: save-summary-report
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Save summary report to workspace"
+    inputs:
+      parameters:
+      - name: summary
+    container:
+      image: alpine:latest
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
+      command: [sh, -c]
+      args:
+      - |
+        set -e
+
+        REPORT_FILE="/workspace/{{workflow.uid}}/pr-summary-report.md"
+
+        echo "Saving summary report to $REPORT_FILE"
+
+        cat > "$REPORT_FILE" <<'EOF'
+        # Pull Request Analysis Report
+
+        **Repository:** {{workflow.parameters.github-org}}/{{workflow.parameters.github-repo}}
+        **Generated:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        **Workflow:** {{workflow.name}}
+
+        ---
+
+        {{inputs.parameters.summary}}
+        EOF
+
+        echo "Report saved successfully"
+        cat "$REPORT_FILE"
+
+  - name: cleanup
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Cleanup workspace (optional - retains for inspection by default)"
+    container:
+      image: alpine:latest
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
+      command: [sh, -c]
+      args:
+      - |
+        echo "Workflow complete. Workspace at /workspace/{{workflow.uid}}"
+        echo "Report available at: /workspace/{{workflow.uid}}/pr-summary-report.md"
+
+        # Optionally uncomment to cleanup workspace:
+        # rm -rf /workspace/{{workflow.uid}}
+        # echo "Workspace cleaned up"
