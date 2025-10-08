@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/dwmkerr/dwmkerr-ark-demo/compare/v0.1.2...v0.1.3) (2025-10-08)
+
+
+### Features
+
+* rename shell to shell-mcp and add MCP servers build matrix ([#10](https://github.com/dwmkerr/dwmkerr-ark-demo/issues/10)) ([c578587](https://github.com/dwmkerr/dwmkerr-ark-demo/commit/c578587703b785ae1172fd26de970ddb128a8a92))
+
 ## [0.1.2](https://github.com/dwmkerr/dwmkerr-ark-demo/compare/v0.1.1...v0.1.2) (2025-10-03)
 
 
