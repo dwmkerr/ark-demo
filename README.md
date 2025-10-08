@@ -73,6 +73,12 @@ Optional MCP servers can be enabled via Helm dependencies:
 
 Set to `true` in `custom-values.yaml` and run `make install` (dependencies update automatically).
 
+## MCP Servers
+
+| Name | Install |
+|------|---------|
+| [shell-mcp](./mcp-servers/shell-mcp/README.md) | `helm install shell-mcp oci://ghcr.io/dwmkerr/charts/shell-mcp` |
+
 ## Interactive Notebooks
 
 ```bash
