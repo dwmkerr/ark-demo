@@ -1,5 +1,5 @@
 apiVersion: v2
-name: shell
+name: shell-mcp
 description: MCP server providing shell command execution tools
 type: application
 version: 0.1.1

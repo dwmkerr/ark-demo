@@ -11,6 +11,10 @@ RUN apk add --no-cache \
     findutils \
     github-cli
 
+# Create non-root user
+RUN addgroup -g 1000 appuser && \
+    adduser -D -u 1000 -G appuser appuser
+
 WORKDIR /app
 
 # Copy requirements and install Python dependencies
@@ -19,6 +23,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy server code
 COPY server.py .
+
+# Change ownership to non-root user
+RUN chown -R appuser:appuser /app
+
+USER appuser
 
 EXPOSE 3000
 
