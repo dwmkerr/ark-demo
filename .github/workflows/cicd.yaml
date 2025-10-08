@@ -42,6 +42,7 @@ jobs:
           helm template test ./chart
 
   release:
+    needs: [mcp-servers]
     runs-on: ubuntu-24.04
     outputs:
       released: ${{ steps.release-please.outputs.release_created || 'false' }}
@@ -91,7 +92,7 @@ jobs:
 
   release-mcp-servers:
     name: Release MCP Server
-    needs: [mcp-servers, release]
+    needs: [release]
     if: ${{ needs.release.outputs.released == 'true' }}
     runs-on: ubuntu-24.04
     strategy:
