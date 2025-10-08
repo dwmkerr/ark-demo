@@ -13,27 +13,14 @@ popd
 # Create a PVC to use as a shared workspace.
 kubectl apply -f ./workspace-pvc.yaml
 
-# Install the shell MCP server, used to run git commands and other shell tools.
-pushd ../../mcp-servers/shell
-devspace deploy
-popd
+# Install the shell MCP server with workspace PVC mounted.
+helm install shell-mcp oci://ghcr.io/dwmkerr/charts/shell-mcp \
+  --set volumes[0].name=workspace \
+  --set volumes[0].persistentVolumeClaim.claimName=github-mcp-workspace \
+  --set volumeMounts[0].name=workspace \
+  --set volumeMounts[0].mountPath=/workspace
 
-# Patch the deployment to mount the workspace PVC to the shell MCP.
-kubectl patch deployment shell --type='json' -p='[
-  {
-    "op": "add",
-    "path": "/spec/template/spec/volumes",
-    "value": [{"name": "workspace", "persistentVolumeClaim": {"claimName": "github-mcp-workspace"}}]
-  },
-  {
-    "op": "add",
-    "path": "/spec/template/spec/containers/0/volumeMounts",
-    "value": [{"name": "workspace", "mountPath": "/workspace"}]
-  }
-]'
-kubectl rollout restart deployment shell
-
-# Install the GitHub MCP server with the same workspace PVC.
+# Install the GitHub MCP server.
 # (This is normally done from the root of this repo with 'make install').
 
 # Create the PR review agent with all GitHub and shell tools
