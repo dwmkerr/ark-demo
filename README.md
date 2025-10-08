@@ -63,21 +63,17 @@ Default configuration includes:
 
 Each provider is automatically enabled only if its corresponding environment variable is set.
 
-## Optional MCP Servers
-
-Optional MCP servers can be enabled via Helm dependencies:
-
-| Name | Values Field |
-|------|-------------|
-| [AI Developer Guide](https://github.com/dwmkerr/ai-developer-guide) | `mcpServers.aiDeveloperGuide.enabled` |
-
-Set to `true` in `custom-values.yaml` and run `make install` (dependencies update automatically).
-
 ## MCP Servers
 
-| Name | Install |
-|------|---------|
-| [shell-mcp](./mcp-servers/shell-mcp/README.md) | `helm install shell-mcp oci://ghcr.io/dwmkerr/charts/shell-mcp` |
+MCP servers can be enabled via Helm dependencies in `custom-values.yaml`:
+
+| Name | Values Field | Standalone Install |
+|------|-------------|-------------------|
+| [shell-mcp](./mcp-servers/shell-mcp/README.md) | `mcpServers.shell.enabled` | `helm install shell-mcp oci://ghcr.io/dwmkerr/charts/shell-mcp` |
+| [github-mcp](./mcp-servers/github-mcp/README.md) | `mcpServers.github.enabled` | `helm install github-mcp oci://ghcr.io/dwmkerr/charts/github-mcp --set github.token="your-token"` |
+| [AI Developer Guide](https://github.com/dwmkerr/ai-developer-guide) | `mcpServers.aiDeveloperGuide.enabled` | `helm install ai-developer-guide-mcp oci://ghcr.io/dwmkerr/charts/ai-developer-guide-mcp` |
+
+Set to `true` in `custom-values.yaml` and run `make install` (dependencies update automatically).
 
 ## Interactive Notebooks
 

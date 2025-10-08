@@ -26,6 +26,16 @@
           "type": "yaml",
           "path": "mcp-servers/shell-mcp/chart/Chart.yaml",
           "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "yaml",
+          "path": "mcp-servers/github-mcp/chart/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "mcp-servers/github-mcp/chart/Chart.yaml",
+          "jsonpath": "$.appVersion"
         }
       ]
     }
