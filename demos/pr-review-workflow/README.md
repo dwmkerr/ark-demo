@@ -28,7 +28,7 @@ helm install github-mcp oci://ghcr.io/dwmkerr/charts/github-mcp \
 kubectl apply -f ./pr-review-agent.yaml
 
 # Create the workflow template.
-kubectl apply -f ./analyze-pull-requests.yaml
+kubectl apply -f ./pr-review-workflow.yaml
 
 # To run the workflow, option 1 is to use the argo cli:
 argo submit --from workflowtemplate/pr-review-workflow \
@@ -74,7 +74,7 @@ kubectl port-forward svc/myminio-console 9443:9443
 
 # Install the minio cli.
 brew install minio-mc
-'
+
 # Port forward the minio service port.
 kubectl port-forward svc/myminio-hl 9000
 
@@ -89,7 +89,17 @@ kubectl create secret generic minio-credentials \
     --from-literal=accessKey="${username}" \
     --from-literal=secretKey="${password}"
 
+# We're going to configure argo to point to minio. This requires the namespace
+# qualified service name. This little snippet is janky - we're grabbing the kube
+# context namespace (as all the other commands in this script don't use '-n' we
+# are essentially doing everything in the current context namespace).
+# Get that namespace - we need it for the service URL used in the S3 config
+# below.
+namespace="$(kubectl config view --minify -o jsonpath='{.contexts[0].context.namespace}')"
+namespace="${namespace:-default}"
+
 # Create artifact repository configmap for argo workflows.
+# This configures Argo to store workflow artifacts in MinIO.
 cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: ConfigMap
@@ -101,9 +111,15 @@ data:
   default-artifact-repository: |
     s3:
       bucket: pr-review-workflow
-      endpoint: myminio-hl.default:9000
-      secure: true
-      insecure: true
+      endpoint: minio.${namespace}.svc.cluster.local:443
+      # MinIO uses TLS, so we set insecure: false and provide the CA certificate.
+      # The CA certificate comes from the myminio-tls secret created by the MinIO operator.
+      # Use full DNS name (minio.default.svc.cluster.local) to match the certificate.
+      insecure: false
+      caSecret:
+        name: myminio-tls
+        key: public.crt
+      # Credentials to minio's S3 backend.
       accessKeySecret:
         name: minio-credentials
         key: accessKey

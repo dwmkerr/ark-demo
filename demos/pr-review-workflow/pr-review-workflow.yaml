@@ -73,7 +73,7 @@ spec:
         echo "checking workflow pvc '${pvc_name}'..."
         kubectl get pvc "${pvc_name}"
 
-        mcp_servers="github shell"
+        mcp_servers="github shell-mcp"
         for mcp_server in ${mcp_servers}; do
           echo "checking mcp server '${mcp_server}'..."
           kubectl get mcpserver "${mcp_server}"
@@ -147,6 +147,8 @@ spec:
       artifacts:
       - name: pr-list
         path: /tmp/pr-list.json
+        archive:
+          none: {}  # Store uncompressed for easy viewing in Argo UI
 
   - name: review-pr
     metadata:
@@ -238,6 +240,8 @@ spec:
       artifacts:
       - name: review
         path: /tmp/review-summary.txt
+        archive:
+          none: {}
 
   - name: summarize-reviews
     metadata:
@@ -272,3 +276,5 @@ spec:
       artifacts:
       - name: summary
         path: /tmp/summary.txt
+        archive:
+          none: {}
