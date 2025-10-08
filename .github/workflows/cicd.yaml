@@ -49,7 +49,6 @@ jobs:
       tag: ${{ steps.release-please.outputs.tag_name }}
     steps:
       - name: Create Release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: googleapis/release-please-action@v4
         id: release-please
         with:
@@ -59,7 +58,7 @@ jobs:
   release-helm:
     name: Release Helm Chart
     needs: [release]
-    if: ${{ needs.release.outputs.released == 'true' }}
+    if: ${{ needs.release.outputs.released }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -92,7 +91,7 @@ jobs:
   release-mcp-servers:
     name: Release MCP Server
     needs: [release]
-    if: ${{ needs.release.outputs.released == 'true' }}
+    if: ${{ needs.release.outputs.released }}
     runs-on: ubuntu-24.04
     strategy:
       matrix:
