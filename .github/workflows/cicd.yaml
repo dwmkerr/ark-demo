@@ -120,8 +120,8 @@ jobs:
       - name: Build and push Docker image
         run: |
           cd mcp-servers/${{ matrix.server }}/server
-          docker build -t ghcr.io/${{ github.repository }}/${{ matrix.server }}:${{ steps.version.outputs.version }} .
-          docker push ghcr.io/${{ github.repository }}/${{ matrix.server }}:${{ steps.version.outputs.version }}
+          docker build -t ghcr.io/${{ github.repository_owner }}/${{ matrix.server }}:${{ steps.version.outputs.version }} .
+          docker push ghcr.io/${{ github.repository_owner }}/${{ matrix.server }}:${{ steps.version.outputs.version }}
 
       - name: Package and push Helm chart
         run: |

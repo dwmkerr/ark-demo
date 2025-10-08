@@ -1,8 +1,9 @@
 replicaCount: 1
 
 image:
-  repository: shell-mcp-server
-  tag: latest
+  registry: ghcr.io
+  repository: dwmkerr/shell-mcp
+  tag: ""
   pullPolicy: IfNotPresent
 
 service:
