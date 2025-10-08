@@ -45,8 +45,8 @@ jobs:
     needs: [mcp-servers]
     runs-on: ubuntu-24.04
     outputs:
-      released: ${{ steps.release-please.outputs.release_created || 'false' }}
-      tag: ${{ steps.release-please.outputs.tag_name || 'v0.0.0-test' }}
+      released: ${{ steps.release-please.outputs.release_created }}
+      tag: ${{ steps.release-please.outputs.tag_name }}
     steps:
       - name: Create Release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
