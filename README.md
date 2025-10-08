@@ -15,8 +15,8 @@ helm upgrade --install dwmkerr-starter-kit oci://ghcr.io/dwmkerr/charts/dwmkerr-
 Or install locally:
 
 ```bash
-cp values.template.yaml values.yaml
-# Edit values.yaml with your API keys
+cp custom-values.template.yaml custom-values.yaml
+# Edit custom-values.yaml with your API keys
 make install
 ```
 
@@ -52,7 +52,7 @@ kubectl get agents
 
 ## Configuration
 
-The chart automatically enables/disables providers based on which API keys you set as environment variables. You can customize the models and base URLs by editing `values.yaml` if needed.
+The chart automatically enables/disables providers based on which API keys you set as environment variables. You can customize the models and base URLs by editing `custom-values.yaml` if needed.
 
 Default configuration includes:
 
@@ -71,7 +71,7 @@ Optional MCP servers can be enabled via Helm dependencies:
 |------|-------------|
 | [AI Developer Guide](https://github.com/dwmkerr/ai-developer-guide) | `mcpServers.aiDeveloperGuide.enabled` |
 
-Set to `true` in `values.yaml` and run `make install` (dependencies update automatically).
+Set to `true` in `custom-values.yaml` and run `make install` (dependencies update automatically).
 
 ## Interactive Notebooks
 

@@ -1,4 +1,4 @@
-values.yaml
+custom-values.yaml
 chart/charts/
 chart/Chart.lock
 .DS_Store
