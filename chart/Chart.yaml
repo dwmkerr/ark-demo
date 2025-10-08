@@ -11,3 +11,11 @@ dependencies:
     version: '>=0.1.0'
     repository: oci://ghcr.io/dwmkerr/charts
     condition: mcpServers.aiDeveloperGuide.enabled
+  - name: shell-mcp
+    version: '>=0.1.0'
+    repository: oci://ghcr.io/dwmkerr/charts
+    condition: mcpServers.shell.enabled
+  - name: github-mcp
+    version: '>=0.1.0'
+    repository: oci://ghcr.io/dwmkerr/charts
+    condition: mcpServers.github.enabled

@@ -57,10 +57,15 @@ models:
 
 # MCP Server configuration
 mcpServers:
-  github:
-    enabled: true  # Set to false to disable GitHub MCP server
-    githubToken: ""  # REQUIRED: Set your GitHub token (ghp_...) for GitHub integration
+  # Shell MCP server - provides shell command execution
+  shell:
+    enabled: true
 
-  # Optional: AI Developer Guide MCP server
+  # GitHub MCP server - provides GitHub integration
+  github:
+    enabled: true
+    githubToken: ""  # REQUIRED: Set your GitHub token (ghp_...)
+
+  # AI Developer Guide MCP server
   aiDeveloperGuide:
-    enabled: true  # Set to false to disable AI Developer Guide MCP server (requires helm dependency update)
+    enabled: true

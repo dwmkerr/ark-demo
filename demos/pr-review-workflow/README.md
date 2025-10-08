@@ -21,7 +21,8 @@ helm install shell-mcp oci://ghcr.io/dwmkerr/charts/shell-mcp \
   --set volumeMounts[0].mountPath=/workspace
 
 # Install the GitHub MCP server.
-# (This is normally done from the root of this repo with 'make install').
+helm install github-mcp oci://ghcr.io/dwmkerr/charts/github-mcp \
+  --set github.token="$GITHUB_TOKEN"
 
 # Create the PR review agent with all GitHub and shell tools
 kubectl apply -f ./pr-review-agent.yaml
