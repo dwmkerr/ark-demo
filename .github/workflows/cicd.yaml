@@ -28,15 +28,27 @@ jobs:
           python-version: '3.11'
 
       - name: Build, lint and test
-        run: cd mcp-servers/${{ matrix.server }} && make init && make lint && make test && make build
+        run: |
+          cd mcp-servers/${{ matrix.server }}
+          make init
+          make lint
+          make test
+          make build
+
+      - name: Validate Chart
+        run: |
+          cd mcp-servers/${{ matrix.server }}
+          helm lint ./chart
+          helm template test ./chart
 
   release:
     runs-on: ubuntu-24.04
     outputs:
-      released: ${{ steps.release-please.outputs.release_created }}
-      tag: ${{ steps.release-please.outputs.tag_name }}
+      released: ${{ steps.release-please.outputs.release_created || 'false' }}
+      tag: ${{ steps.release-please.outputs.tag_name || 'v0.0.0-test' }}
     steps:
       - name: Create Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: googleapis/release-please-action@v4
         id: release-please
         with:
