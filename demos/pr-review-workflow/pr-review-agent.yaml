@@ -228,5 +228,5 @@ spec:
     type: custom
   - name: github-update-pull-request-branch
     type: custom
-  - name: shell-execute-shell-command
+  - name: shell-mcp-execute-shell-command
     type: custom
