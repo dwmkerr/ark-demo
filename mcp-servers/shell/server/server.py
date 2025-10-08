@@ -23,74 +23,53 @@ async def health_check(request: Request) -> PlainTextResponse:
     return PlainTextResponse("OK")
 
 @mcp.tool(name="execute-shell-command")
-def execute_command(
-    command: Literal["bash", "git", "gh", "curl", "wget", "cat", "ls", "pwd", "sed", "grep", "find"],
-    args: list[str] = []
-) -> str:
-    """Execute common shell commands in a containerized environment.
+def execute_command(command: str) -> str:
+    """Execute shell commands via bash -c in a containerized environment.
 
-    AVAILABLE COMMANDS:
-      bash    - Execute arbitrary shell scripts (fallback for complex operations)
-      git     - Version control operations (clone, commit, push, diff, log, status, etc.)
-      gh      - GitHub CLI for PR/issue management (pr list, pr view, issue list, etc.)
-      curl    - HTTP requests and API calls
-      wget    - Download files from URLs
-      cat     - Display file contents
-      ls      - List directory contents
-      pwd     - Print working directory
-      sed     - Stream editor for text transformation
-      grep    - Search text patterns in files
-      find    - Search for files by name or pattern
+    The command is executed as: bash -c "<command>"
+
+    AVAILABLE TOOLS (Alpine Linux 3.x base image):
+      Standard tools: bash, sh, cat, ls, pwd, mkdir, rm, mv, cp, echo, cd, touch, chmod, chown
+      Text processing: sed, grep, awk, cut, sort, uniq, head, tail, wc, tr
+      File operations: find, tar, gzip, zip, unzip
+      Network: curl, wget
+      Version control: git
+      GitHub: gh (GitHub CLI)
 
     USAGE EXAMPLES:
-      Git status:
-        execute_command(command="git", args=["status"])
-
       List files:
-        execute_command(command="ls", args=["-la"])
+        execute_command(command="ls -la /workspace")
+
+      Create directory and file:
+        execute_command(command="mkdir -p /workspace/test && echo 'content' > /workspace/test/file.txt")
+
+      Git operations:
+        execute_command(command="git clone https://github.com/org/repo.git && cd repo && git log --oneline -5")
 
       GitHub PR list:
-        execute_command(command="gh", args=["pr", "list", "--state", "open"])
+        execute_command(command="gh pr list --repo org/repo --state open")
 
-      Bash script (use for pipes, redirects, complex logic):
-        execute_command(command="bash", args=["-c", "echo 'hello' | grep hello"])
+      Write file with heredoc:
+        execute_command(command="cat > /workspace/review.md << 'EOF'\\n# Review\\nContent here\\nEOF")
 
-      Search in files:
-        execute_command(command="grep", args=["-r", "pattern", "."])
-
-    WHEN TO USE BASH:
-      Use bash with -c for:
-      - Pipes (|) and redirects (>, >>)
-      - Multiple commands chained with && or ;
-      - Complex shell logic with if/for/while
-      - Variable expansion and substitution
-
-    WORKING DIRECTORY:
-      Use 'pwd' to check current directory
-      Mount volumes as needed via Kubernetes deployment configuration
-
-    SECURITY:
-      Commands run in an isolated container environment.
-      Only specified commands are allowed for safety.
+      Search and process:
+        execute_command(command="find /workspace -name '*.md' | xargs grep -l 'pattern'")
 
     Args:
-        command: The shell command to execute
-        args: Arguments to pass to the command
+        command: The shell command string to execute
 
     Returns:
         Command output including stdout, stderr, and exit code
     """
-    # Execute the command
     try:
         result = subprocess.run(
-            [command] + args,
+            ["bash", "-c", command],
             capture_output=True,
             text=True,
-            timeout=300  # 5 minute timeout
+            timeout=300
         )
 
-        output = f"Command: {command} {' '.join(args)}\n"
-        output += f"Exit Code: {result.returncode}\n\n"
+        output = f"Exit Code: {result.returncode}\n\n"
 
         if result.stdout:
             output += f"STDOUT:\n{result.stdout}\n"
@@ -102,9 +81,6 @@ def execute_command(
 
     except subprocess.TimeoutExpired:
         return f"Error: Command timed out after 300 seconds"
-
-    except FileNotFoundError:
-        return f"Error: Command '{command}' not found"
 
     except Exception as e:
         return f"Error executing command: {str(e)}"

@@ -36,14 +36,20 @@ kubectl rollout restart deployment shell
 # Install the GitHub MCP server with the same workspace PVC.
 # TODO: Add GitHub MCP installation instructions
 
+# Create the PR review agent with all GitHub and shell tools
+kubectl apply -f ./pr-review-agent.yaml
+
 # Create the workflow template.
 kubectl apply -f ./analyze-pull-requests.yaml
 
-# Open the Argo UI. If you are using `devspace dev` for `ark-workflows` this
-# port is automatically forwarded.
+# To run the workflow, option 1 is to use the argo cli:
+argo submit --from workflowtemplate/pr-review-workflow \
+    -p github-org=mckinsey \
+    -p github-repo=agents-at-scale-ark \
+    --watch
+
+# Option 2 is to use the UI. If you are using `devspace dev` for
+# `ark-workflows` this port is automatically forwarded.
 kubectl port-forward 2746:2746 &
 open http://localhost:2746
-
-# Run the workflow. Suggested values:
-# - 
 ```
