@@ -1,0 +1,22 @@
+replicaCount: 1
+
+image:
+  repository: shell-mcp-server
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 3000
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Volumes and mounts for the deployment
+volumes: []
+volumeMounts: []
