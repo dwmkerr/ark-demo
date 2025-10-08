@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/dwmkerr/dwmkerr-ark-demo/compare/v0.1.3...v0.1.4) (2025-10-08)
+
+
+### Features
+
+* move github-mcp to standalone chart with multi-arch support ([#12](https://github.com/dwmkerr/dwmkerr-ark-demo/issues/12)) ([10c0ae4](https://github.com/dwmkerr/dwmkerr-ark-demo/commit/10c0ae4129a0cec989cbd331ad8ca82c48c1229a))
+
 ## [0.1.3](https://github.com/dwmkerr/dwmkerr-ark-demo/compare/v0.1.2...v0.1.3) (2025-10-08)
 
 
