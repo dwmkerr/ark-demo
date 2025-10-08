@@ -10,6 +10,11 @@ spec:
   entrypoint: main
   serviceAccountName: argo-workflow
 
+  # Reference to artifact repository configmap
+  artifactRepositoryRef:
+    configMap: artifact-repositories
+    key: default-artifact-repository
+
   arguments:
     parameters:
     - name: github-org
@@ -95,6 +100,8 @@ spec:
         kind: Query
         metadata:
           name: ${query_name}
+          annotations:
+            ark.mckinsey.com/workflow-name: "{{workflow.name}}"
         spec:
           input: |
             List all open pull requests for repository {{workflow.parameters.github-org}}/{{workflow.parameters.github-repo}}.
@@ -109,6 +116,8 @@ spec:
         # TODO: this is the most painful part at the moment, we have to poll, we
         # can't use kubectl wait, very painful.
         # We could use 'ark query --wait' or something?
+        # We could use 'ark wait ??'
+        # Can we use a similar metholodology for HITL?
         timeout=300
         elapsed=0
         while [ ${elapsed} -lt ${timeout} ]; do
@@ -135,11 +144,9 @@ spec:
       - name: result
         valueFrom:
           path: /tmp/pr-list.json
-      # TODO: Enable artifacts once artifact storage is configured
-      # See: https://argo-workflows.readthedocs.io/en/latest/configure-artifact-repository/
-      # artifacts:
-      # - name: pr-list
-      #   path: /tmp/pr-list.json
+      artifacts:
+      - name: pr-list
+        path: /tmp/pr-list.json
 
   - name: review-pr
     metadata:
@@ -167,6 +174,8 @@ spec:
         kind: Query
         metadata:
           name: ${query_name}
+          annotations:
+            ark.mckinsey.com/workflow-name: "{{workflow.name}}"
         spec:
           input: |
             Review pull request #${pr_id} in repository {{workflow.parameters.github-org}}/{{workflow.parameters.github-repo}}.
@@ -226,6 +235,9 @@ spec:
       - name: review-summary
         valueFrom:
           path: /tmp/review-summary.txt
+      artifacts:
+      - name: review
+        path: /tmp/review-summary.txt
 
   - name: summarize-reviews
     metadata:
@@ -251,8 +263,12 @@ spec:
 
         echo ""
         echo "Review files:"
-        find "${workspace_path}" -name "review.md" -type f
+        find "${workspace_path}" -name "review.md" -type f | tee /tmp/summary.txt
     volumes:
     - name: workspace
       persistentVolumeClaim:
         claimName: "{{workflow.parameters.workspace-pvc-name}}"
+    outputs:
+      artifacts:
+      - name: summary
+        path: /tmp/summary.txt

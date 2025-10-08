@@ -18,7 +18,7 @@ pushd ../../mcp-servers/shell
 devspace deploy
 popd
 
-# Patch the deployment to mount the workspace PVC
+# Patch the deployment to mount the workspace PVC to the shell MCP.
 kubectl patch deployment shell --type='json' -p='[
   {
     "op": "add",
@@ -34,7 +34,7 @@ kubectl patch deployment shell --type='json' -p='[
 kubectl rollout restart deployment shell
 
 # Install the GitHub MCP server with the same workspace PVC.
-# TODO: Add GitHub MCP installation instructions
+# (This is normally done from the root of this repo with 'make install').
 
 # Create the PR review agent with all GitHub and shell tools
 kubectl apply -f ./pr-review-agent.yaml
@@ -52,4 +52,75 @@ argo submit --from workflowtemplate/pr-review-workflow \
 # `ark-workflows` this port is automatically forwarded.
 kubectl port-forward 2746:2746 &
 open http://localhost:2746
+```
+
+## Artifact Storage
+
+Argo can store artifacts to any S3 backend. To enable [Minio as an Artifact Repository](https://argo-workflows.readthedocs.io/en/latest/configure-artifact-repository/#configuring-minio):
+
+```bash
+# Install the minio operator.
+helm repo add minio https://charts.min.io/ # official minio Helm charts
+helm repo update
+
+# Install the minio tenant.
+helm upgrade --install minio-tenant minio-operator/tenant
+
+# Get the username / password. Defaults to:
+# Username: minio
+# Password: minio123
+username="$(kubectl get secret myminio-env-configuration \
+    -o jsonpath='{.data.config\.env}' | base64 -d |\
+    grep MINIO_ROOT_USER | cut -d'"' -f2)"
+password="$(kubectl get secret myminio-env-configuration \
+    -o jsonpath='{.data.config\.env}' | base64 -d |\
+    grep MINIO_ROOT_PASSWORD | cut -d'"' -f2)"
+echo "Minio root user:"
+echo "  username: ${username}"
+echo "  password: ${password}"
+
+# Open the console. Use the username/password.
+kubectl port-forward svc/myminio-console 9443:9443
+# or:
+# minikube service --url myminio-console
+
+# Install the minio cli.
+brew install minio-mc
+'
+# Port forward the minio service port.
+kubectl port-forward svc/myminio-hl 9000
+
+# Set the mc client to our minio tenant.
+mc alias set myminio https://localhost:9000 "${username}" "${password}" --insecure
+
+# Create a bucket for the pr-review-workflow.
+mc mb myminio/pr-review-workflow --insecure
+
+# Create a secret for argo to access minio.
+kubectl create secret generic minio-credentials \
+    --from-literal=accessKey="${username}" \
+    --from-literal=secretKey="${password}"
+
+# Create artifact repository configmap for argo workflows.
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: artifact-repositories
+  annotations:
+    workflows.argoproj.io/default-artifact-repository: default-artifact-repository
+data:
+  default-artifact-repository: |
+    s3:
+      bucket: pr-review-workflow
+      endpoint: myminio-hl.default:9000
+      secure: true
+      insecure: true
+      accessKeySecret:
+        name: minio-credentials
+        key: accessKey
+      secretKeySecret:
+        name: minio-credentials
+        key: secretKey
+EOF
 ```

@@ -12,6 +12,24 @@ permissions:
   packages: write
 
 jobs:
+  mcp-servers:
+    name: Build MCP Servers
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        server: [shell-mcp]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build, lint and test
+        run: cd mcp-servers/${{ matrix.server }} && make init && make lint && make test && make build
+
   release:
     runs-on: ubuntu-24.04
     outputs:
