@@ -1,0 +1,274 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: pr-review-workflow
+  annotations:
+    workflows.argoproj.io/title: "Pull Requests Review"
+    workflows.argoproj.io/description: |
+      Analyzes all open pull requests in a GitHub repository using an ARK agent.
+spec:
+  entrypoint: main
+  serviceAccountName: argo-workflow
+
+  # Reference to artifact repository configmap
+  artifactRepositoryRef:
+    configMap: artifact-repositories
+    key: default-artifact-repository
+
+  arguments:
+    parameters:
+    - name: github-org
+      value: "mckinsey"
+      description: "GitHub organization name"
+
+    - name: github-repo
+      value: "agents-at-scale-ark"
+      description: "GitHub repository name"
+
+    - name: workspace-pvc-name
+      value: "github-mcp-workspace"
+      description: "Name of the PVC to use for workspace"
+
+    - name: agent-name
+      value: "pr-review-agent"
+      description: "ARK agent name for PR operations"
+
+  templates:
+  - name: main
+    dag:
+      tasks:
+      - name: validate-setup
+        template: validate-setup
+
+      - name: list-prs
+        template: list-prs
+        dependencies: [validate-setup]
+
+      - name: review-prs
+        template: review-pr
+        dependencies: [list-prs]
+        arguments:
+          parameters:
+          - name: pr-id
+            value: "{{item}}"
+        withParam: "{{tasks.list-prs.outputs.parameters.result}}"
+        continueOn:
+          failed: true
+
+      - name: summarize-reviews
+        template: summarize-reviews
+        dependencies: [review-prs]
+
+  - name: validate-setup
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Validate prerequisites"
+    script:
+      image: bitnami/kubectl:latest
+      command: [bash]
+      source: |
+        set -e -o pipefail
+
+        pvc_name="{{workflow.parameters.workspace-pvc-name}}"
+        echo "checking workflow pvc '${pvc_name}'..."
+        kubectl get pvc "${pvc_name}"
+
+        mcp_servers="github shell"
+        for mcp_server in ${mcp_servers}; do
+          echo "checking mcp server '${mcp_server}'..."
+          kubectl get mcpserver "${mcp_server}"
+        done
+
+        agent_name="{{workflow.parameters.agent-name}}"
+        echo "checking agent '${agent_name}'..."
+        kubectl get agent "${agent_name}"
+
+  - name: list-prs
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "List open PRs using agent"
+    script:
+      image: bitnami/kubectl:latest
+      command: [bash]
+      source: |
+        set -e -o pipefail
+        query_name="{{workflow.name}}-list-prs"
+
+        # Create Query to list PRs
+        kubectl create -f - <<EOF >&2
+        apiVersion: ark.mckinsey.com/v1alpha1
+        kind: Query
+        metadata:
+          name: ${query_name}
+          annotations:
+            ark.mckinsey.com/workflow-name: "{{workflow.name}}"
+        spec:
+          input: |
+            List all open pull requests for repository {{workflow.parameters.github-org}}/{{workflow.parameters.github-repo}}.
+            Return ONLY a JSON array of PR numbers. Format: [1, 2, 3]
+          targets:
+          - type: agent
+            name: {{workflow.parameters.agent-name}}
+          timeout: 5m
+        EOF
+
+        # Wait for completion.
+        # TODO: this is the most painful part at the moment, we have to poll, we
+        # can't use kubectl wait, very painful.
+        # We could use 'ark query --wait' or something?
+        # We could use 'ark wait ??'
+        # Can we use a similar metholodology for HITL?
+        timeout=300
+        elapsed=0
+        while [ ${elapsed} -lt ${timeout} ]; do
+          phase=$(kubectl get query "${query_name}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+          if [ "${phase}" = "done" ]; then
+            break
+          elif [ "${phase}" = "error" ]; then
+            echo "Query failed with error" >&2
+            exit 1
+          fi
+          sleep 2
+          elapsed=$((elapsed + 2))
+        done
+        if [ ${elapsed} -ge ${timeout} ]; then
+          echo "Query timed out after ${timeout}s" >&2
+          exit 1
+        fi
+
+        # Get result and write to output file
+        pr_list=$(kubectl get query "${query_name}" -o jsonpath='{.status.responses[0].content}')
+        echo "${pr_list}" > /tmp/pr-list.json
+    outputs:
+      parameters:
+      - name: result
+        valueFrom:
+          path: /tmp/pr-list.json
+      artifacts:
+      - name: pr-list
+        path: /tmp/pr-list.json
+
+  - name: review-pr
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Review a PR using agent with workspace"
+    inputs:
+      parameters:
+      - name: pr-id
+    script:
+      image: bitnami/kubectl:latest
+      command: [bash]
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
+      source: |
+        set -e -o pipefail
+        pr_id="{{inputs.parameters.pr-id}}"
+        workflow_id="{{workflow.name}}"
+        query_name="${workflow_id}-review-pr-${pr_id}"
+        workspace_path="/workspace/${workflow_id}/${pr_id}"
+
+        # Create Query to review PR with explicit workspace instructions
+        kubectl create -f - <<EOF >&2
+        apiVersion: ark.mckinsey.com/v1alpha1
+        kind: Query
+        metadata:
+          name: ${query_name}
+          annotations:
+            ark.mckinsey.com/workflow-name: "{{workflow.name}}"
+        spec:
+          input: |
+            Review pull request #${pr_id} in repository {{workflow.parameters.github-org}}/{{workflow.parameters.github-repo}}.
+
+            IMPORTANT: Use the following workflow:
+            1. First, create the workspace directory: use execute-shell-command with 'mkdir' and args ['-p', '${workspace_path}']
+            2. Change to that directory: use execute-shell-command with 'cd' and args ['${workspace_path}']
+            3. Analyze the pull request using GitHub tools
+            4. Write your review to ${workspace_path}/review.md using execute-shell-command with 'bash' and args ['-c', 'cat > ${workspace_path}/review.md << EOF
+            <your review content here>
+            EOF']
+
+            Your review should include:
+            1. PR summary and purpose
+            2. Key changes
+            3. Potential issues or concerns
+            4. Recommendations for reviewers
+
+            Format: Markdown
+          targets:
+          - type: agent
+            name: {{workflow.parameters.agent-name}}
+          timeout: 10m
+        EOF
+
+        # Wait for completion
+        timeout=600
+        elapsed=0
+        while [ ${elapsed} -lt ${timeout} ]; do
+          phase=$(kubectl get query "${query_name}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+          if [ "${phase}" = "done" ]; then
+            break
+          elif [ "${phase}" = "error" ]; then
+            echo "Query failed with error" >&2
+            exit 1
+          fi
+          sleep 2
+          elapsed=$((elapsed + 2))
+        done
+        if [ ${elapsed} -ge ${timeout} ]; then
+          echo "Query timed out after ${timeout}s" >&2
+          exit 1
+        fi
+
+        # Verify workspace structure
+        [ -d "${workspace_path}" ] || { echo "Workspace directory not found: ${workspace_path}" >&2; exit 1; }
+        [ -f "${workspace_path}/review.md" ] || { echo "Review file not found: ${workspace_path}/review.md" >&2; exit 1; }
+
+        # Read review from workspace
+        cat "${workspace_path}/review.md" | tee /tmp/review-summary.txt
+    volumes:
+    - name: workspace
+      persistentVolumeClaim:
+        claimName: "{{workflow.parameters.workspace-pvc-name}}"
+    outputs:
+      parameters:
+      - name: review-summary
+        valueFrom:
+          path: /tmp/review-summary.txt
+      artifacts:
+      - name: review
+        path: /tmp/review-summary.txt
+
+  - name: summarize-reviews
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Summarize all PR reviews from workspace"
+    script:
+      image: bitnami/kubectl:latest
+      command: [bash]
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
+      source: |
+        set -e -o pipefail
+        workflow_id="{{workflow.name}}"
+        workspace_path="/workspace/${workflow_id}"
+
+        echo "Summarizing reviews in ${workspace_path}..."
+
+        [ -d "${workspace_path}" ] || { echo "Workspace directory not found: ${workspace_path}"; exit 1; }
+
+        echo "PR directories:"
+        find "${workspace_path}" -maxdepth 1 -type d
+
+        echo ""
+        echo "Review files:"
+        find "${workspace_path}" -name "review.md" -type f | tee /tmp/summary.txt
+    volumes:
+    - name: workspace
+      persistentVolumeClaim:
+        claimName: "{{workflow.parameters.workspace-pvc-name}}"
+    outputs:
+      artifacts:
+      - name: summary
+        path: /tmp/summary.txt

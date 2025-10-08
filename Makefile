@@ -10,12 +10,12 @@ NAMESPACE ?= default
 
 .PHONY: install
 install: # install the dwmkerr starter kit models to the cluster using Helm
-	@if [ ! -f values.yaml ]; then echo "Error: values.yaml not found. Run 'cp values.template.yaml values.yaml' and configure your API keys."; exit 1; fi
+	@if [ ! -f custom-values.yaml ]; then echo "Error: custom-values.yaml not found. Run 'cp custom-values.template.yaml custom-values.yaml' and configure your API keys."; exit 1; fi
 	# Update Helm dependencies for optional MCP servers
 	helm dependency update $(CHART_PATH)
 	# Install everything in one step
 	helm upgrade --install $(CHART_NAME) $(CHART_PATH) \
-		--values values.yaml \
+		--values custom-values.yaml \
 		--create-namespace \
 		--namespace $(NAMESPACE) \
 		--wait
@@ -47,4 +47,4 @@ status: # show deployment status
 .PHONY: template
 template: # render chart templates to see what would be created
 	helm template $(CHART_NAME) $(CHART_PATH) \
-		--values values.yaml
+		--values custom-values.yaml

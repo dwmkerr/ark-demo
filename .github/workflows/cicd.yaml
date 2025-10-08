@@ -12,7 +12,37 @@ permissions:
   packages: write
 
 jobs:
+  mcp-servers:
+    name: Build MCP Servers
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        server: [shell-mcp]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build, lint and test
+        run: |
+          cd mcp-servers/${{ matrix.server }}
+          make init
+          make lint
+          make test
+          make build
+
+      - name: Validate Chart
+        run: |
+          cd mcp-servers/${{ matrix.server }}
+          helm lint ./chart
+          helm template test ./chart
+
   release:
+    needs: [mcp-servers]
     runs-on: ubuntu-24.04
     outputs:
       released: ${{ steps.release-please.outputs.release_created }}
@@ -57,3 +87,43 @@ jobs:
         run: |
           helm package ./chart
           helm push dwmkerr-starter-kit-${{ steps.version.outputs.version }}.tgz oci://ghcr.io/${{ github.repository_owner }}/charts
+
+  release-mcp-servers:
+    name: Release MCP Server
+    needs: [release]
+    if: ${{ needs.release.outputs.released }}
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        server: [shell-mcp]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${{ needs.release.outputs.tag }}
+          echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        run: |
+          cd mcp-servers/${{ matrix.server }}/server
+          docker build -t ghcr.io/${{ github.repository_owner }}/${{ matrix.server }}:${{ steps.version.outputs.version }} .
+          docker push ghcr.io/${{ github.repository_owner }}/${{ matrix.server }}:${{ steps.version.outputs.version }}
+
+      - name: Package and push Helm chart
+        run: |
+          cd mcp-servers/${{ matrix.server }}
+          helm package ./chart --version ${{ steps.version.outputs.version }} --app-version ${{ steps.version.outputs.version }}
+          helm push ${{ matrix.server }}-${{ steps.version.outputs.version }}.tgz oci://ghcr.io/${{ github.repository_owner }}/charts

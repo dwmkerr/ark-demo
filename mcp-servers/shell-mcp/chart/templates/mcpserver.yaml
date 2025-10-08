@@ -1,0 +1,14 @@
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: MCPServer
+metadata:
+  name: {{ include "shell.name" . }}
+  labels:
+    {{- include "shell.labels" . | nindent 4 }}
+spec:
+  description: "Shell command execution MCP server - execute bash, git, gh, curl, and other common shell commands"
+  transport: http
+  address:
+    valueFrom:
+      serviceRef:
+        name: {{ include "shell.name" . }}
+        port: http
