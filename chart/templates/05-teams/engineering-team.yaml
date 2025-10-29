@@ -4,7 +4,7 @@ kind: Team
 metadata:
   name: engineering-team
   labels:
-    {{- include "dwmkerr-starter-kit.labels" . | nindent 4 }}
+    {{- include "ark-demo.labels" . | nindent 4 }}
 spec:
   description: Engineering team with planner and lead software engineer using selector strategy
   strategy: selector

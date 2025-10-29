@@ -1,11 +1,11 @@
 apiVersion: v2
-name: dwmkerr-starter-kit
+name: ark-demo
 description: A Helm chart for dwmkerr's Ark demo models and agents
 type: application
 version: 0.1.5
 appVersion: 0.1.5
 annotations:
-  ark.mckinsey.com/service: dwmkerr-starter-kit
+  ark.mckinsey.com/service: ark-demo
 dependencies:
   - name: ai-developer-guide-mcp
     version: '>=0.1.0'

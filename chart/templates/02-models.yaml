@@ -7,7 +7,7 @@ kind: Model
 metadata:
   name: {{ .name }}
   labels:
-    {{- include "dwmkerr-starter-kit.labels" $ | nindent 4 }}
+    {{- include "ark-demo.labels" $ | nindent 4 }}
   annotations:
     ark.mckinsey.com/dashboard-icon: "/icons/claude.png"
 spec:
@@ -36,7 +36,7 @@ kind: Model
 metadata:
   name: {{ .name }}
   labels:
-    {{- include "dwmkerr-starter-kit.labels" $ | nindent 4 }}
+    {{- include "ark-demo.labels" $ | nindent 4 }}
   annotations:
     ark.mckinsey.com/dashboard-icon: "/icons/gemini.png"
 spec:
@@ -65,7 +65,7 @@ kind: Model
 metadata:
   name: {{ .name }}
   labels:
-    {{- include "dwmkerr-starter-kit.labels" $ | nindent 4 }}
+    {{- include "ark-demo.labels" $ | nindent 4 }}
   annotations:
     ark.mckinsey.com/dashboard-icon: "/icons/azure.png"
 spec:
@@ -96,7 +96,7 @@ kind: Model
 metadata:
   name: {{ .name }}
   labels:
-    {{- include "dwmkerr-starter-kit.labels" $ | nindent 4 }}
+    {{- include "ark-demo.labels" $ | nindent 4 }}
   annotations:
     ark.mckinsey.com/dashboard-icon: "/icons/openai-blue.png"
 spec:
@@ -125,7 +125,7 @@ kind: Model
 metadata:
   name: {{ .name }}
   labels:
-    {{- include "dwmkerr-starter-kit.labels" $ | nindent 4 }}
+    {{- include "ark-demo.labels" $ | nindent 4 }}
   annotations:
     ark.mckinsey.com/dashboard-icon: "/icons/aws.png"
 spec:
