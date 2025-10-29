@@ -8,6 +8,7 @@ metadata:
   annotations:
     ark.mckinsey.com/dashboard-icon: "/icons/claude.png"
 spec:
+  description: Code review specialist who helps improve code quality, identifies issues, and suggests improvements
   modelRef:
     name: claude-4-opus
   prompt: |

@@ -1,0 +1,22 @@
+{{- if .Values.mcpServers.shell.enabled }}
+---
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: Tool
+metadata:
+  name: call-shell-subagent
+  labels:
+    {{- include "dwmkerr-starter-kit.labels" . | nindent 4 }}
+spec:
+  type: agent
+  description: Execute shell commands via specialized shell operations agent
+  inputSchema:
+    type: object
+    properties:
+      input:
+        type: string
+        description: Shell command or task to execute
+    required:
+      - input
+  agent:
+    name: shell-subagent
+{{- end }}

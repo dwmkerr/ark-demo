@@ -1,6 +1,21 @@
 # dwmkerr-ark-demo
 
-A Helm chart for deploying model configurations to Ark for demo purposes.
+A Helm chart for deploying model configurations to [Ark](https://github.com/mckinsey/agents-at-scale-ark) (the Agentic Runtime for Kubernetes) for demo purposes.
+
+This demo kit includes Models, Agents, Agents-as-Tools (sometimes called "Sub-agents"), MCP servers, and also includes Jupyter Notebooks showing different ways to call into Ark.
+
+<!-- vim-markdown-toc GFM -->
+
+- [Quickstart](#quickstart)
+- [Resources Created](#resources-created)
+    - [Models](#models)
+    - [Agents](#agents)
+    - [Teams](#teams)
+    - [Tools](#tools)
+    - [MCP Servers](#mcp-servers)
+- [Interactive Notebooks](#interactive-notebooks)
+
+<!-- vim-markdown-toc -->
 
 ## Quickstart
 
@@ -30,6 +45,17 @@ export AZURE_OPENAI_API_KEY="your-azure-openai-api-key-here"
 export OPENAI_API_KEY="your-openai-api-key-here"
 ```
 
+The chart automatically enables/disables providers based on which API keys you set as environment variables. You can customize the models and base URLs by editing `custom-values.yaml` if needed.
+
+Default configuration includes:
+
+- Anthropic: Claude models with API key from `ANTHROPIC_API_KEY`
+- Gemini: Google Gemini models with API key from `GEMINI_API_KEY`
+- Azure OpenAI: GPT models with API key from `AZURE_OPENAI_API_KEY`
+- OpenAI: GPT models with API key from `OPENAI_API_KEY`
+
+Each provider is automatically enabled only if its corresponding environment variable is set.
+
 Then use the following commands to deploy the demo kit:
 
 ```bash
@@ -43,27 +69,56 @@ make uninstall
 make status
 ```
 
-A set of models and demo agents will be created. Check them with:
+A set of models, agents, MCP servers, and tools will be created. Check them with:
 
 ```bash
 kubectl get models
 kubectl get agents
+kubectl get mcpservers
+kubectl get tools
 ```
 
-## Configuration
+## Resources Created
 
-The chart automatically enables/disables providers based on which API keys you set as environment variables. You can customize the models and base URLs by editing `custom-values.yaml` if needed.
+The following resources are created:
 
-Default configuration includes:
+### Models
 
-- Anthropic: Claude models with API key from `ANTHROPIC_API_KEY`
-- Gemini: Google Gemini models with API key from `GEMINI_API_KEY`
-- Azure OpenAI: GPT models with API key from `AZURE_OPENAI_API_KEY`
-- OpenAI: GPT models with API key from `OPENAI_API_KEY`
+As long as the appropriate API Keys are provided, models for Azure OpenAI, Gemini, Anthropic and OpenAI providers will be created:
 
-Each provider is automatically enabled only if its corresponding environment variable is set.
+![Screenshot of Models](./docs/models-screenshot.png)
 
-## MCP Servers
+### Agents
+
+The following agents will be deployed:
+
+| Agent Name | Deployed When | Description | Tools |
+|------------|---------------|-------------|-------|
+| `code-reviewer` | Always | Code review specialist who helps improve code quality, identifies issues, and suggests improvements | None |
+| `planner` | Always | Planning specialist who breaks down complex tasks into manageable steps and creates actionable plans | None |
+| `team-leader` | Always | Team leader and strategic planner who coordinates work distribution among team members | None |
+| `lead-software-engineer` | Always | Lead software engineer with access to development tools, GitHub operations, and best practices | Conditional: GitHub tools, AI Developer Guide tools, shell subagent |
+| `github-agent` | `mcpServers.github.enabled` | GitHub specialist for repository management, issues, pull requests, workflows, and security | All GitHub MCP tools |
+| `shell-subagent` | `mcpServers.shell.enabled` | Specialized shell operations agent that executes commands safely (used as agent-as-tool) | Shell MCP tool |
+
+### Teams
+
+| Team Name | Strategy | Members | Description |
+|-----------|----------|---------|-------------|
+| `coding-team` | Sequential | planner, code-reviewer | Collaborative team with planner and code reviewer working sequentially on development tasks |
+| `engineering-team` | Selector | planner, lead-software-engineer | Engineering team with planner and lead software engineer using AI-driven participant selection |
+
+### Tools
+
+The following custom tools are created:
+
+| Tool Name | Type | Deployed When | Description |
+|-----------|------|---------------|-------------|
+| `call-shell-subagent` | agent | `mcpServers.shell.enabled` | Executes shell commands via specialized shell operations agent (agents-as-tools pattern) |
+
+Many tools from each MCP server will also be discovered on startup.
+
+### MCP Servers
 
 MCP servers can be enabled via Helm dependencies in `custom-values.yaml`:
 
@@ -85,7 +140,3 @@ pip install jupyterlab
 |---------|-------------|
 | `python -m jupyterlab notebooks/ark-openai-apis-basic.ipynb` | Simple non-interactive demo showing basic ARK OpenAI API usage |
 | `python -m jupyterlab notebooks/ark-openai-apis.ipynb` | Interactive interface with widgets for target selection and streaming modes |
-
-# TODO
-
-- agents as tools

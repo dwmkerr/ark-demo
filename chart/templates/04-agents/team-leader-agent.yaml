@@ -6,6 +6,7 @@ metadata:
   labels:
     {{- include "dwmkerr-starter-kit.labels" . | nindent 4 }}
 spec:
+  description: Team leader and strategic planner who coordinates work distribution among team members
   # Uses default model configured in the system
   prompt: |
     I am a team leader and strategic planner responsible for coordinating work distribution among team members.

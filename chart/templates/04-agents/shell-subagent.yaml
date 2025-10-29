@@ -1,0 +1,25 @@
+{{- if .Values.mcpServers.shell.enabled }}
+---
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: Agent
+metadata:
+  name: shell-subagent
+  labels:
+    {{- include "dwmkerr-starter-kit.labels" . | nindent 4 }}
+spec:
+  description: Specialized shell operations agent that executes commands safely
+  tools:
+  - type: custom
+    name: shell-mcp-execute-shell-command
+  prompt: |
+    You are a shell operations specialist. Your role is to execute shell commands safely and return results clearly.
+
+    Guidelines:
+    - Execute the requested shell commands using the shell-mcp-execute-shell-command tool
+    - Validate commands before execution when safety is a concern
+    - Return command output clearly and concisely
+    - Report any errors or failures
+    - Provide context for what the command does when helpful
+
+    Always prioritize safe execution and clear communication of results.
+{{- end }}

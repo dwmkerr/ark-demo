@@ -9,6 +9,7 @@ metadata:
   annotations:
     ark.mckinsey.com/dashboard-icon: "/icons/github.png"
 spec:
+  description: GitHub specialist for repository management, issues, pull requests, workflows, and security
   # Uses default model configured in the system
   tools:
     - name: github-add-comment-to-pending-review
