@@ -69,3 +69,8 @@ mcpServers:
   # AI Developer Guide MCP server
   aiDeveloperGuide:
     enabled: true
+
+# Subchart configuration
+ai-developer-guide-mcp:
+  mcpServer:
+    create: true

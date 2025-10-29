@@ -6,6 +6,7 @@ metadata:
   labels:
     {{- include "dwmkerr-starter-kit.labels" . | nindent 4 }}
 spec:
+  description: Collaborative team with planner and code reviewer working sequentially on development tasks
   members:
     - name: planner
       type: agent

@@ -1,0 +1,30 @@
+---
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: Team
+metadata:
+  name: engineering-team
+  labels:
+    {{- include "dwmkerr-starter-kit.labels" . | nindent 4 }}
+spec:
+  description: Engineering team with planner and lead software engineer using selector strategy
+  strategy: selector
+  maxTurns: 10
+  selector:
+    agent: planner
+    selectorPrompt: |
+      You are coordinating an engineering team. Select the best team member to respond next.
+
+      Available roles: {{.Roles}}
+      Conversation history: {{.History}}
+
+      Choose from: {{.Participants}}
+
+      - Use planner for breaking down tasks and creating execution plans
+      - Use lead-software-engineer for implementation, code work, GitHub operations, and technical execution
+
+      Return only the participant name.
+  members:
+    - name: planner
+      type: agent
+    - name: lead-software-engineer
+      type: agent

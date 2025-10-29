@@ -8,7 +8,6 @@ metadata:
   annotations:
     ark.mckinsey.com/dashboard-icon: "/icons/claude.png"
 spec:
-  modelRef:
-    name: claude-3-5-haiku
+  description: Planning specialist who breaks down complex tasks into manageable steps and creates actionable plans
   prompt: |
     I'm a planning specialist who helps break down complex tasks into manageable steps and create actionable plans.

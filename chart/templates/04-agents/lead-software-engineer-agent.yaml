@@ -1,0 +1,131 @@
+---
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: Agent
+metadata:
+  name: lead-software-engineer
+  labels:
+    {{- include "dwmkerr-starter-kit.labels" . | nindent 4 }}
+  annotations:
+    ark.mckinsey.com/dashboard-icon: "/icons/claude.png"
+spec:
+  description: Lead software engineer with access to development tools, GitHub operations, and best practices
+  {{- if or .Values.mcpServers.github.enabled .Values.mcpServers.aiDeveloperGuide.enabled .Values.mcpServers.shell.enabled }}
+  tools:
+    {{- if .Values.mcpServers.github.enabled }}
+    - name: github-add-comment-to-pending-review
+      type: custom
+    - name: github-add-issue-comment
+      type: custom
+    - name: github-assign-copilot-to-issue
+      type: custom
+    - name: github-create-branch
+      type: custom
+    - name: github-create-or-update-file
+      type: custom
+    - name: github-create-pull-request
+      type: custom
+    - name: github-create-repository
+      type: custom
+    - name: github-delete-file
+      type: custom
+    - name: github-fork-repository
+      type: custom
+    - name: github-get-commit
+      type: custom
+    - name: github-get-file-contents
+      type: custom
+    - name: github-get-label
+      type: custom
+    - name: github-get-latest-release
+      type: custom
+    - name: github-get-me
+      type: custom
+    - name: github-get-release-by-tag
+      type: custom
+    - name: github-get-tag
+      type: custom
+    - name: github-get-team-members
+      type: custom
+    - name: github-get-teams
+      type: custom
+    - name: github-issue-read
+      type: custom
+    - name: github-issue-write
+      type: custom
+    - name: github-list-branches
+      type: custom
+    - name: github-list-commits
+      type: custom
+    - name: github-list-issue-types
+      type: custom
+    - name: github-list-issues
+      type: custom
+    - name: github-list-pull-requests
+      type: custom
+    - name: github-list-releases
+      type: custom
+    - name: github-list-tags
+      type: custom
+    - name: github-merge-pull-request
+      type: custom
+    - name: github-pull-request-read
+      type: custom
+    - name: github-pull-request-review-write
+      type: custom
+    - name: github-push-files
+      type: custom
+    - name: github-request-copilot-review
+      type: custom
+    - name: github-search-code
+      type: custom
+    - name: github-search-issues
+      type: custom
+    - name: github-search-pull-requests
+      type: custom
+    - name: github-search-repositories
+      type: custom
+    - name: github-search-users
+      type: custom
+    - name: github-sub-issue-write
+      type: custom
+    - name: github-update-pull-request
+      type: custom
+    - name: github-update-pull-request-branch
+      type: custom
+    {{- end }}
+    {{- if .Values.mcpServers.aiDeveloperGuide.enabled }}
+    - name: ai-developer-guide-fetch-guide
+      type: custom
+    - name: ai-developer-guide-fetch-main-guide
+      type: custom
+    - name: ai-developer-guide-list-available-guides
+      type: custom
+    {{- end }}
+    {{- if .Values.mcpServers.shell.enabled }}
+    - name: call-shell-subagent
+      type: custom
+    {{- end }}
+  {{- end }}
+  prompt: |
+    I'm a lead software engineer with expertise in code development, architecture, and best practices.
+
+    I have access to powerful development tools:
+    {{- if .Values.mcpServers.shell.enabled }}
+    - Shell subagent for development operations (git, testing, building, etc.) via call-shell-subagent
+    {{- end }}
+    {{- if .Values.mcpServers.github.enabled }}
+    - GitHub operations (repository management, PRs, issues, workflows, code scanning)
+    {{- end }}
+    {{- if .Values.mcpServers.aiDeveloperGuide.enabled }}
+    - AI Developer Guide for best practices and patterns
+    {{- end }}
+
+    I can help with:
+    - Code review and quality improvements
+    - Architecture and design decisions
+    - Development workflow automation
+    - Best practices and coding standards
+    - Repository and project management
+    - CI/CD pipeline operations
+
+    Ask me anything related to software engineering and development!
