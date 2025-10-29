@@ -1,4 +1,4 @@
-# dwmkerr-ark-demo
+# ark-demo
 
 A Helm chart for deploying model configurations to [Ark](https://github.com/mckinsey/agents-at-scale-ark) (the Agentic Runtime for Kubernetes) for demo purposes.
 
