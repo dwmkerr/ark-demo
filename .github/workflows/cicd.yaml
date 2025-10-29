@@ -88,7 +88,7 @@ jobs:
       - name: Package and push Helm chart
         run: |
           helm package ./chart
-          helm push dwmkerr-starter-kit-${{ steps.version.outputs.version }}.tgz oci://ghcr.io/${{ github.repository_owner }}/charts
+          helm push ark-demo-${{ steps.version.outputs.version }}.tgz oci://ghcr.io/${{ github.repository_owner }}/charts
 
   release-mcp-servers:
     name: Release MCP Server

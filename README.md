@@ -22,7 +22,7 @@ This demo kit includes Models, Agents, Agents-as-Tools (sometimes called "Sub-ag
 Install via Helm:
 
 ```bash
-helm upgrade --install dwmkerr-starter-kit oci://ghcr.io/dwmkerr/charts/dwmkerr-starter-kit \
+helm upgrade --install ark-demo oci://ghcr.io/dwmkerr/charts/ark-demo \
     --set models.anthropic.apiKey="your-key" \
     --set models.gemini.apiKey="your-key"
 ```

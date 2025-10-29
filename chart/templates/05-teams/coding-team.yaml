@@ -4,7 +4,7 @@ kind: Team
 metadata:
   name: coding-team
   labels:
-    {{- include "dwmkerr-starter-kit.labels" . | nindent 4 }}
+    {{- include "ark-demo.labels" . | nindent 4 }}
 spec:
   description: Collaborative team with planner and code reviewer working sequentially on development tasks
   members:

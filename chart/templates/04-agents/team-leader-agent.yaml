@@ -4,7 +4,7 @@ kind: Agent
 metadata:
   name: team-leader
   labels:
-    {{- include "dwmkerr-starter-kit.labels" . | nindent 4 }}
+    {{- include "ark-demo.labels" . | nindent 4 }}
 spec:
   description: Team leader and strategic planner who coordinates work distribution among team members
   # Uses default model configured in the system

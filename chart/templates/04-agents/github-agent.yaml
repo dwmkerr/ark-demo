@@ -5,7 +5,7 @@ kind: Agent
 metadata:
   name: github-agent
   labels:
-    {{- include "dwmkerr-starter-kit.labels" . | nindent 4 }}
+    {{- include "ark-demo.labels" . | nindent 4 }}
   annotations:
     ark.mckinsey.com/dashboard-icon: "/icons/github.png"
 spec:

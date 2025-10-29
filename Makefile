@@ -4,7 +4,7 @@
 help: # show help for each recipe
 	@grep -E '^[a-zA-Z0-9 -]+:.*#' Makefile | sort | while read -r l; do printf "\033[1;32m$$(echo $$l | cut -f 1 -d':')\033[00m:$$(echo $$l | cut -f 2- -d'#')\n"; done
 
-CHART_NAME := dwmkerr-starter-kit
+CHART_NAME := ark-demo
 CHART_PATH := ./chart
 NAMESPACE ?= default
 
@@ -42,7 +42,7 @@ uninstall-all: uninstall # uninstall all resources including internal tools
 .PHONY: status
 status: # show deployment status
 	helm status $(CHART_NAME) --namespace $(NAMESPACE)
-	kubectl get models,secrets -l ark.mckinsey.com/service=dwmkerr-starter-kit -n $(NAMESPACE)
+	kubectl get models,secrets -l ark.mckinsey.com/service=ark-demo -n $(NAMESPACE)
 
 .PHONY: template
 template: # render chart templates to see what would be created
