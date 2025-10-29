@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.6](https://github.com/dwmkerr/ark-demo/compare/v0.1.5...v0.1.6) (2025-10-29)
+
+
+### Bug Fixes
+
+* rename helm chart from dwmkerr-starter-kit to ark-demo ([#17](https://github.com/dwmkerr/ark-demo/issues/17)) ([67b2380](https://github.com/dwmkerr/ark-demo/commit/67b238042473c17dff2af256c1ae9c7c3a4253b4))
+
 ## [0.1.5](https://github.com/dwmkerr/dwmkerr-ark-demo/compare/v0.1.4...v0.1.5) (2025-10-29)
 
 
