@@ -129,7 +129,7 @@ spec:
   - name: list-prs
     metadata:
       annotations:
-        workflows.argoproj.io/description: "List open PRs using GitHub CLI or explicit PR IDs"
+        workflows.argoproj.io/description: "List open PRs using GitHub API or explicit PR IDs"
     script:
       image: alpine/k8s:1.28.13
       command: [sh]
@@ -146,15 +146,20 @@ spec:
           echo "$pr_ids" | tr ',' '\n' | jq -R . | jq -s 'map(tonumber)' > /tmp/pr-list.json
           echo "Using $(jq 'length' /tmp/pr-list.json) explicitly specified PRs"
         else
-          # Query GitHub for all open PRs matching filters.
-          apk add --no-cache github-cli
+          # Query GitHub API for all open PRs.
+          apk add --no-cache curl
 
-          gh pr list \
-            --repo {{workflow.parameters.github-org}}/{{workflow.parameters.github-repo}} \
-            --state open \
-            --search "updated:>{{workflow.parameters.updated-since}}" \
-            --json number \
-            --jq '[.[].number]' > /tmp/pr-list.json
+          # Build authorization header if token provided.
+          auth_header=""
+          if [ -n "$GH_TOKEN" ]; then
+            auth_header="Authorization: Bearer $GH_TOKEN"
+          fi
+
+          # Fetch open PRs from GitHub API.
+          curl -sS -H "$auth_header" \
+            "https://api.github.com/repos/{{workflow.parameters.github-org}}/{{workflow.parameters.github-repo}}/pulls?state=open&per_page=100" \
+            | jq --arg since "{{workflow.parameters.updated-since}}" \
+              '[.[] | select(.updated_at > $since) | .number]' > /tmp/pr-list.json
 
           echo "Found $(jq 'length' /tmp/pr-list.json) open PRs"
         fi
