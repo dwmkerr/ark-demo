@@ -115,7 +115,7 @@ spec:
           ttl: 24h
         EOF
 
-        # Wait for completion using kubectl wait
+        # Wait for query completion (success or failure)
         kubectl wait --for=condition=Completed \
           --timeout=5m query/${query_name}
 
@@ -196,7 +196,7 @@ spec:
           ttl: 24h
         EOF
 
-        # Wait for completion using kubectl wait
+        # Wait for query completion (success or failure)
         kubectl wait --for=condition=Completed \
           --timeout=10m query/${query_name}
 

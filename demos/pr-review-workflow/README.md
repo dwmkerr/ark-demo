@@ -11,10 +11,6 @@ See [Argo Workflows documentation](https://mckinsey.github.io/agents-at-scale-ar
 helm upgrade --install argo-workflows \
   oci://ghcr.io/mckinsey/agents-at-scale-ark/charts/argo-workflows
 
-# Or for local development:
-# cd ~/repos/github/mckinsey/agents-at-scale-ark/services/argo-workflows
-# devspace dev
-
 # Create a PVC to use as a shared workspace.
 kubectl apply -f ./workspace-pvc.yaml
 
