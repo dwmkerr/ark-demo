@@ -24,7 +24,25 @@ helm install github-mcp oci://ghcr.io/dwmkerr/charts/github-mcp \
 
 # Create the workflow template, agent, and workspace PVC.
 kubectl apply -f ./pr-review-workflow.yaml
+```
 
+### Upgrading Existing Installation
+
+If you already have the MCP servers installed without workspace configuration, upgrade with:
+
+```bash
+helm upgrade ark-demo oci://ghcr.io/dwmkerr/charts/ark-demo \
+  --set shell-mcp.volumes[0].name=workspace \
+  --set shell-mcp.volumes[0].persistentVolumeClaim.claimName=github-mcp-workspace \
+  --set shell-mcp.volumeMounts[0].name=workspace \
+  --set shell-mcp.volumeMounts[0].mountPath=/workspace \
+  --set github-mcp.github.token="$GITHUB_TOKEN" \
+  --reuse-values
+```
+
+## Running the Workflow
+
+```bash
 # To run the workflow, option 1 is to use the argo cli:
 argo submit --from workflowtemplate/pr-review-workflow \
     -p github-org=mckinsey \
