@@ -44,6 +44,10 @@ spec:
       value: "false"
       description: "If true, post review comments to PRs. Requires gh-token to be set."
 
+    - name: updated-since
+      value: "2000-01-01T00:00:00Z"
+      description: "Only review PRs updated since this timestamp. Format: ISO8601 (e.g., 2024-01-01T00:00:00Z)."
+
   templates:
   - name: main
     dag:
@@ -135,10 +139,11 @@ spec:
         # Install GitHub CLI
         apk add --no-cache github-cli
 
-        # List open PRs and format as JSON array
+        # List open PRs updated since threshold
         gh pr list \
           --repo {{workflow.parameters.github-org}}/{{workflow.parameters.github-repo}} \
           --state open \
+          --search "updated:>{{workflow.parameters.updated-since}}" \
           --json number \
           --jq '[.[].number]' > /tmp/pr-list.json
 
