@@ -11,9 +11,6 @@ See [Argo Workflows documentation](https://mckinsey.github.io/agents-at-scale-ar
 helm upgrade --install argo-workflows \
   oci://ghcr.io/mckinsey/agents-at-scale-ark/charts/argo-workflows
 
-# Create a PVC to use as a shared workspace.
-kubectl apply -f ./workspace-pvc.yaml
-
 # Install the shell MCP server with workspace PVC mounted.
 helm install shell-mcp oci://ghcr.io/dwmkerr/charts/shell-mcp \
   --set volumes[0].name=workspace \
@@ -25,10 +22,7 @@ helm install shell-mcp oci://ghcr.io/dwmkerr/charts/shell-mcp \
 helm install github-mcp oci://ghcr.io/dwmkerr/charts/github-mcp \
   --set github.token="$GITHUB_TOKEN"
 
-# Create the PR review agent with all GitHub and shell tools
-kubectl apply -f ./pr-review-agent.yaml
-
-# Create the workflow template.
+# Create the workflow template, agent, and workspace PVC.
 kubectl apply -f ./pr-review-workflow.yaml
 
 # To run the workflow, option 1 is to use the argo cli:
