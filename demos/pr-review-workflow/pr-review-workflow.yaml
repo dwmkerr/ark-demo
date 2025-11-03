@@ -100,6 +100,8 @@ spec:
         kind: Query
         metadata:
           name: ${query_name}
+          labels:
+            workflow: "{{workflow.name}}"
           annotations:
             ark.mckinsey.com/workflow-name: "{{workflow.name}}"
         spec:
@@ -110,29 +112,17 @@ spec:
           - type: agent
             name: {{workflow.parameters.agent-name}}
           timeout: 5m
+          ttl: 24h
         EOF
 
-        # Wait for completion.
-        # TODO: this is the most painful part at the moment, we have to poll, we
-        # can't use kubectl wait, very painful.
-        # We could use 'ark query --wait' or something?
-        # We could use 'ark wait ??'
-        # Can we use a similar metholodology for HITL?
-        timeout=300
-        elapsed=0
-        while [ ${elapsed} -lt ${timeout} ]; do
-          phase=$(kubectl get query "${query_name}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
-          if [ "${phase}" = "done" ]; then
-            break
-          elif [ "${phase}" = "error" ]; then
-            echo "Query failed with error" >&2
-            exit 1
-          fi
-          sleep 2
-          elapsed=$((elapsed + 2))
-        done
-        if [ ${elapsed} -ge ${timeout} ]; then
-          echo "Query timed out after ${timeout}s" >&2
+        # Wait for completion using kubectl wait
+        kubectl wait --for=condition=Completed \
+          --timeout=5m query/${query_name}
+
+        # Check if query succeeded or failed
+        phase=$(kubectl get query "${query_name}" -o jsonpath='{.status.phase}')
+        if [ "${phase}" = "error" ]; then
+          echo "Query failed with error" >&2
           exit 1
         fi
 
@@ -176,6 +166,8 @@ spec:
         kind: Query
         metadata:
           name: ${query_name}
+          labels:
+            workflow: "{{workflow.name}}"
           annotations:
             ark.mckinsey.com/workflow-name: "{{workflow.name}}"
         spec:
@@ -201,24 +193,17 @@ spec:
           - type: agent
             name: {{workflow.parameters.agent-name}}
           timeout: 10m
+          ttl: 24h
         EOF
 
-        # Wait for completion
-        timeout=600
-        elapsed=0
-        while [ ${elapsed} -lt ${timeout} ]; do
-          phase=$(kubectl get query "${query_name}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
-          if [ "${phase}" = "done" ]; then
-            break
-          elif [ "${phase}" = "error" ]; then
-            echo "Query failed with error" >&2
-            exit 1
-          fi
-          sleep 2
-          elapsed=$((elapsed + 2))
-        done
-        if [ ${elapsed} -ge ${timeout} ]; then
-          echo "Query timed out after ${timeout}s" >&2
+        # Wait for completion using kubectl wait
+        kubectl wait --for=condition=Completed \
+          --timeout=10m query/${query_name}
+
+        # Check if query succeeded or failed
+        phase=$(kubectl get query "${query_name}" -o jsonpath='{.status.phase}')
+        if [ "${phase}" = "error" ]; then
+          echo "Query failed with error" >&2
           exit 1
         fi
 

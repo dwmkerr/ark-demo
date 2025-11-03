@@ -4,11 +4,16 @@ This workflow reviews all requests in a GitHub repository.
 
 ## Installation
 
+See [Argo Workflows documentation](https://mckinsey.github.io/agents-at-scale-ark/developer-guide/workflows/argo-workflows) for full details.
+
 ```bash
-# Ensure Argo / Ark Workflows is installed.
-pushd ~/repos/github/McK-Internal/agents-at-scale-marketplace/ark-workflows
-devspace deploy
-popd
+# Install Argo Workflows for ARK
+helm upgrade --install argo-workflows \
+  oci://ghcr.io/mckinsey/agents-at-scale-ark/charts/argo-workflows
+
+# Or for local development:
+# cd ~/repos/github/mckinsey/agents-at-scale-ark/services/argo-workflows
+# devspace dev
 
 # Create a PVC to use as a shared workspace.
 kubectl apply -f ./workspace-pvc.yaml
