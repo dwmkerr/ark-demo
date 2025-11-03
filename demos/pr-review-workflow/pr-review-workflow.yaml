@@ -6,6 +6,9 @@ metadata:
     workflows.argoproj.io/title: "Pull Requests Review"
     workflows.argoproj.io/description: |
       Analyzes all open pull requests in a GitHub repository using an ARK agent.
+
+      GitHub Token: If gh-token is provided, the workflow can post review comments
+      and status updates to PRs. Without a token, the workflow runs in read-only mode.
 spec:
   entrypoint: main
   serviceAccountName: argo-workflow
@@ -33,12 +36,24 @@ spec:
       value: "pr-review-agent"
       description: "ARK agent name for PR operations"
 
+    - name: gh-token
+      value: ""
+      description: "GitHub token for API access. If provided, enables PR commenting and status updates."
+
+    - name: comment-on-pr
+      value: "false"
+      description: "If true, post review comments to PRs. Requires gh-token to be set."
+
   templates:
   - name: main
     dag:
       tasks:
+      - name: prepare-workflow
+        template: prepare-workflow
+
       - name: validate-setup
         template: validate-setup
+        dependencies: [prepare-workflow]
 
       - name: list-prs
         template: list-prs
@@ -58,6 +73,27 @@ spec:
       - name: summarize-reviews
         template: summarize-reviews
         dependencies: [review-prs]
+
+  - name: prepare-workflow
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Validate workflow parameters"
+    script:
+      image: alpine/k8s:1.28.13
+      command: [sh]
+      source: |
+        set -e -o pipefail
+
+        comment_on_pr="{{workflow.parameters.comment-on-pr}}"
+        gh_token="{{workflow.parameters.gh-token}}"
+
+        if [ "${comment_on_pr}" = "true" ] && [ -z "${gh_token}" ]; then
+          echo "Error: comment-on-pr is enabled but gh-token is not set" >&2
+          echo "Please provide a GitHub token to enable PR commenting" >&2
+          exit 1
+        fi
+
+        echo "Workflow parameters validated successfully"
 
   - name: validate-setup
     metadata:
@@ -90,6 +126,9 @@ spec:
     script:
       image: alpine/k8s:1.28.13
       command: [sh]
+      env:
+      - name: GH_TOKEN
+        value: "{{workflow.parameters.gh-token}}"
       source: |
         set -e -o pipefail
 
