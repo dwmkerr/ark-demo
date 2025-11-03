@@ -86,49 +86,24 @@ spec:
   - name: list-prs
     metadata:
       annotations:
-        workflows.argoproj.io/description: "List open PRs using agent"
+        workflows.argoproj.io/description: "List open PRs using GitHub CLI"
     script:
-      image: bitnami/kubectl:latest
-      command: [bash]
+      image: alpine/k8s:1.28.13
+      command: [sh]
       source: |
         set -e -o pipefail
-        query_name="{{workflow.name}}-list-prs"
 
-        # Create Query to list PRs
-        kubectl create -f - <<EOF >&2
-        apiVersion: ark.mckinsey.com/v1alpha1
-        kind: Query
-        metadata:
-          name: ${query_name}
-          labels:
-            workflow: "{{workflow.name}}"
-          annotations:
-            ark.mckinsey.com/workflow-name: "{{workflow.name}}"
-        spec:
-          input: |
-            List all open pull requests for repository {{workflow.parameters.github-org}}/{{workflow.parameters.github-repo}}.
-            Return ONLY a JSON array of PR numbers. Format: [1, 2, 3]
-          targets:
-          - type: agent
-            name: {{workflow.parameters.agent-name}}
-          timeout: 5m
-          ttl: 24h
-        EOF
+        # Install GitHub CLI
+        apk add --no-cache github-cli
 
-        # Wait for query completion (success or failure)
-        kubectl wait --for=condition=Completed \
-          --timeout=5m query/${query_name}
+        # List open PRs and format as JSON array
+        gh pr list \
+          --repo {{workflow.parameters.github-org}}/{{workflow.parameters.github-repo}} \
+          --state open \
+          --json number \
+          --jq '[.[].number]' > /tmp/pr-list.json
 
-        # Check if query succeeded or failed
-        phase=$(kubectl get query "${query_name}" -o jsonpath='{.status.phase}')
-        if [ "${phase}" = "error" ]; then
-          echo "Query failed with error" >&2
-          exit 1
-        fi
-
-        # Get result and write to output file
-        pr_list=$(kubectl get query "${query_name}" -o jsonpath='{.status.responses[0].content}')
-        echo "${pr_list}" > /tmp/pr-list.json
+        echo "Found $(jq 'length' /tmp/pr-list.json) open PRs"
     outputs:
       parameters:
       - name: result
