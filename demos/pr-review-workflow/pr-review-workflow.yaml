@@ -13,11 +13,6 @@ spec:
   entrypoint: main
   serviceAccountName: argo-workflow
 
-  # Reference to artifact repository configmap
-  artifactRepositoryRef:
-    configMap: artifact-repositories
-    key: default-artifact-repository
-
   arguments:
     parameters:
     - name: github-org
