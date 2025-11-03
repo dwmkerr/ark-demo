@@ -48,6 +48,10 @@ spec:
       value: "2000-01-01T00:00:00Z"
       description: "Only review PRs updated since this timestamp. Format: ISO8601 (e.g., 2024-01-01T00:00:00Z)."
 
+    - name: pr-ids
+      value: ""
+      description: "Comma-separated PR IDs to review (e.g., 234,56,2). If empty, uses all open PRs matching filters."
+
   templates:
   - name: main
     dag:
@@ -126,7 +130,7 @@ spec:
   - name: list-prs
     metadata:
       annotations:
-        workflows.argoproj.io/description: "List open PRs using GitHub CLI"
+        workflows.argoproj.io/description: "List open PRs using GitHub CLI or explicit PR IDs"
     script:
       image: alpine/k8s:1.28.13
       command: [sh]
@@ -136,18 +140,26 @@ spec:
       source: |
         set -e -o pipefail
 
-        # Install GitHub CLI
-        apk add --no-cache github-cli
+        pr_ids="{{workflow.parameters.pr-ids}}"
 
-        # List open PRs updated since threshold
-        gh pr list \
-          --repo {{workflow.parameters.github-org}}/{{workflow.parameters.github-repo}} \
-          --state open \
-          --search "updated:>{{workflow.parameters.updated-since}}" \
-          --json number \
-          --jq '[.[].number]' > /tmp/pr-list.json
+        if [ -n "$pr_ids" ]; then
+          # Use explicitly provided PR IDs
+          echo "$pr_ids" | tr ',' '\n' | jq -R . | jq -s 'map(tonumber)' > /tmp/pr-list.json
+          echo "Using $(jq 'length' /tmp/pr-list.json) explicitly specified PRs"
+        else
+          # Install GitHub CLI and query for PRs
+          apk add --no-cache github-cli
 
-        echo "Found $(jq 'length' /tmp/pr-list.json) open PRs"
+          # List open PRs updated since threshold
+          gh pr list \
+            --repo {{workflow.parameters.github-org}}/{{workflow.parameters.github-repo}} \
+            --state open \
+            --search "updated:>{{workflow.parameters.updated-since}}" \
+            --json number \
+            --jq '[.[].number]' > /tmp/pr-list.json
+
+          echo "Found $(jq 'length' /tmp/pr-list.json) open PRs"
+        fi
     outputs:
       parameters:
       - name: result
