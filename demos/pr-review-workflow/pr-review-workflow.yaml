@@ -92,6 +92,7 @@ spec:
       source: |
         set -e -o pipefail
 
+        # Check that gh-token is provided if PR commenting is enabled.
         comment_on_pr="{{workflow.parameters.comment-on-pr}}"
         gh_token="{{workflow.parameters.gh-token}}"
 
@@ -113,16 +114,19 @@ spec:
       source: |
         set -e -o pipefail
 
+        # Verify the workspace PVC exists.
         pvc_name="{{workflow.parameters.workspace-pvc-name}}"
         echo "checking workflow pvc '${pvc_name}'..."
         kubectl get pvc "${pvc_name}"
 
+        # Verify required MCP servers are installed.
         mcp_servers="github shell-mcp"
         for mcp_server in ${mcp_servers}; do
           echo "checking mcp server '${mcp_server}'..."
           kubectl get mcpserver "${mcp_server}"
         done
 
+        # Verify the PR review agent exists.
         agent_name="{{workflow.parameters.agent-name}}"
         echo "checking agent '${agent_name}'..."
         kubectl get agent "${agent_name}"
@@ -143,14 +147,13 @@ spec:
         pr_ids="{{workflow.parameters.pr-ids}}"
 
         if [ -n "$pr_ids" ]; then
-          # Use explicitly provided PR IDs
+          # Use explicitly provided PR IDs, convert to JSON array.
           echo "$pr_ids" | tr ',' '\n' | jq -R . | jq -s 'map(tonumber)' > /tmp/pr-list.json
           echo "Using $(jq 'length' /tmp/pr-list.json) explicitly specified PRs"
         else
-          # Install GitHub CLI and query for PRs
+          # Query GitHub for all open PRs matching filters.
           apk add --no-cache github-cli
 
-          # List open PRs updated since threshold
           gh pr list \
             --repo {{workflow.parameters.github-org}}/{{workflow.parameters.github-repo}} \
             --state open \
@@ -186,12 +189,14 @@ spec:
         mountPath: /workspace
       source: |
         set -e -o pipefail
+
+        # Generate unique names and paths for this PR review.
         pr_id="{{inputs.parameters.pr-id}}"
         workflow_id="{{workflow.name}}"
         query_name="${workflow_id}-review-pr-${pr_id}"
         workspace_path="/workspace/${workflow_id}/${pr_id}"
 
-        # Create Query to review PR with explicit workspace instructions
+        # Create Query to review PR, with instructions to use the workspace.
         kubectl create -f - <<EOF >&2
         apiVersion: ark.mckinsey.com/v1alpha1
         kind: Query
@@ -227,22 +232,22 @@ spec:
           ttl: 24h
         EOF
 
-        # Wait for query completion (success or failure)
+        # Wait for query completion (success or failure).
         kubectl wait --for=condition=Completed \
           --timeout=10m query/${query_name}
 
-        # Check if query succeeded or failed
+        # Exit if the query failed.
         phase=$(kubectl get query "${query_name}" -o jsonpath='{.status.phase}')
         if [ "${phase}" = "error" ]; then
           echo "Query failed with error" >&2
           exit 1
         fi
 
-        # Verify workspace structure
+        # Verify the agent wrote the review to the workspace.
         [ -d "${workspace_path}" ] || { echo "Workspace directory not found: ${workspace_path}" >&2; exit 1; }
         [ -f "${workspace_path}/review.md" ] || { echo "Review file not found: ${workspace_path}/review.md" >&2; exit 1; }
 
-        # Read review from workspace
+        # Output the review for workflow artifacts.
         cat "${workspace_path}/review.md" | tee /tmp/review-summary.txt
     volumes:
     - name: workspace
@@ -271,6 +276,8 @@ spec:
         mountPath: /workspace
       source: |
         set -e -o pipefail
+
+        # Find all review files in the workspace.
         workflow_id="{{workflow.name}}"
         workspace_path="/workspace/${workflow_id}"
 
