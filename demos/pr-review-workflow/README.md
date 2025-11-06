@@ -11,33 +11,20 @@ See [Argo Workflows documentation](https://mckinsey.github.io/agents-at-scale-ar
 helm upgrade --install argo-workflows \
   oci://ghcr.io/mckinsey/agents-at-scale-ark/charts/argo-workflows
 
-# Install the shell MCP server with workspace PVC mounted.
-helm install shell-mcp oci://ghcr.io/dwmkerr/charts/shell-mcp \
-  --set volumes[0].name=workspace \
-  --set volumes[0].persistentVolumeClaim.claimName=github-mcp-workspace \
-  --set volumeMounts[0].name=workspace \
-  --set volumeMounts[0].mountPath=/workspace
+# Install ark-demo as usual, ensuring shell and GitHub MCP servers are enabled:
+# e.g:
+# make install
 
-# Install the GitHub MCP server.
-helm install github-mcp oci://ghcr.io/dwmkerr/charts/github-mcp \
-  --set github.token="$GITHUB_TOKEN"
-
-# Create the workflow template, agent, and workspace PVC.
-kubectl apply -f ./pr-review-workflow.yaml
-```
-
-### Upgrading Existing Installation
-
-If you already have the MCP servers installed without workspace configuration, upgrade with:
-
-```bash
+# Then upgrade to add workspace configuration:
 helm upgrade ark-demo oci://ghcr.io/dwmkerr/charts/ark-demo \
   --set shell-mcp.volumes[0].name=workspace \
   --set shell-mcp.volumes[0].persistentVolumeClaim.claimName=github-mcp-workspace \
   --set shell-mcp.volumeMounts[0].name=workspace \
   --set shell-mcp.volumeMounts[0].mountPath=/workspace \
-  --set github-mcp.github.token="$GITHUB_TOKEN" \
   --reuse-values
+
+# Create the workflow template, agent, and workspace PVC.
+kubectl apply -f ./pr-review-workflow.yaml
 ```
 
 ## Running the Workflow
@@ -141,3 +128,14 @@ data:
         key: secretKey
 EOF
 ```
+
+# TODO
+
+# Task list
+
+- [ ] attribution
+- [ ] 'since'
+- [ ] service / gateway
+- [ ] GH token -> GH MCP per workflow
+- [ ] Wait on workflow required resources
+- [ ] PVC

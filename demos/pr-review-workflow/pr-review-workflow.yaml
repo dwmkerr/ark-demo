@@ -54,13 +54,18 @@ spec:
       - name: prepare-workflow
         template: prepare-workflow
 
-      - name: validate-setup
-        template: validate-setup
+      - name: check-token-scopes
+        template: check-token-scopes
         dependencies: [prepare-workflow]
+
+      - name: suspend-if-risky
+        template: suspend-token-warning
+        dependencies: [check-token-scopes]
+        when: "{{tasks.check-token-scopes.outputs.parameters.is-risky}} == true"
 
       - name: list-prs
         template: list-prs
-        dependencies: [validate-setup]
+        dependencies: [check-token-scopes]
 
       - name: review-prs
         template: review-pr
@@ -82,8 +87,8 @@ spec:
       annotations:
         workflows.argoproj.io/description: "Validate workflow parameters and prerequisites"
     script:
-      image: bitnami/kubectl:latest
-      command: [bash]
+      image: alpine/k8s:1.28.13
+      command: [sh]
       source: |
         set -e -o pipefail
 
@@ -96,25 +101,6 @@ spec:
           echo "Please provide a GitHub token to enable PR commenting" >&2
           exit 1
         fi
-
-        # Verify required MCP servers are installed.
-        mcp_servers="github shell-mcp"
-        for mcp_server in ${mcp_servers}; do
-          echo "checking mcp server '${mcp_server}'..."
-          kubectl get mcpserver "${mcp_server}"
-        done
-
-        echo "Workflow parameters and prerequisites validated successfully"
-
-  - name: validate-setup
-    metadata:
-      annotations:
-        workflows.argoproj.io/description: "Validate prerequisites"
-    script:
-      image: bitnami/kubectl:latest
-      command: [bash]
-      source: |
-        set -e -o pipefail
 
         # Verify the workspace PVC exists.
         pvc_name="{{workflow.parameters.workspace-pvc-name}}"
@@ -132,6 +118,106 @@ spec:
         agent_name="{{workflow.parameters.agent-name}}"
         echo "checking agent '${agent_name}'..."
         kubectl get agent "${agent_name}"
+
+        echo "Workflow parameters and prerequisites validated successfully"
+
+  - name: check-token-scopes
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Check GitHub token for risky scopes"
+    script:
+      image: alpine/k8s:1.28.13
+      command: [sh]
+      env:
+      - name: GH_TOKEN
+        value: "{{workflow.parameters.gh-token}}"
+      source: |
+        set -e -o pipefail
+
+        # Skip check if no token provided
+        if [ -z "$GH_TOKEN" ]; then
+          echo "No GitHub token provided, skipping scope check"
+          echo "false" > /tmp/is-risky
+          exit 0
+        fi
+
+        # Install gh CLI
+        apk add --no-cache github-cli
+
+        # Get token scopes
+        echo "Checking GitHub token scopes..."
+        scopes=$(echo "$GH_TOKEN" | gh auth login --with-token && gh api user -i | grep -i "x-oauth-scopes:" | cut -d: -f2-)
+
+        echo "Token scopes: $scopes"
+
+        # Define dangerous scopes (one per line)
+        cat > /tmp/dangerous-scopes <<'SCOPELIST'
+        repo
+        delete_repo
+        admin:org
+        admin:public_key
+        admin:repo_hook
+        admin:gpg_key
+        workflow
+        SCOPELIST
+
+        # Check each dangerous scope
+        is_risky="false"
+        while read -r dangerous_scope; do
+          # Trim whitespace
+          dangerous_scope=$(echo "$dangerous_scope" | xargs)
+          [ -z "$dangerous_scope" ] && continue
+
+          if echo "$scopes" | grep -qw "$dangerous_scope"; then
+            echo "⚠️  FOUND: Token has '$dangerous_scope' scope"
+            is_risky="true"
+          fi
+        done < /tmp/dangerous-scopes
+
+        # Output result as parameter
+        echo "$is_risky"
+        echo "$is_risky" > /tmp/is-risky
+
+        if [ "$is_risky" = "true" ]; then
+          echo "Token has elevated permissions - workflow will suspend for review"
+        else
+          echo "✓ Token scopes are appropriate"
+        fi
+    outputs:
+      parameters:
+      - name: is-risky
+        valueFrom:
+          path: /tmp/is-risky
+
+  - name: suspend-token-warning
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: |
+          ⚠️  TOKEN SECURITY WARNING
+
+          This GitHub token has elevated scopes that exceed what's needed for PR reviews.
+
+          CURRENT ISSUE: Token includes 'repo', 'delete_repo', 'admin:org', or 'workflow' scopes
+          RECOMMENDED SCOPES: public_repo, read:org
+
+          OPTIONS:
+          1. CONTINUE: Resume workflow to proceed with current token (not recommended)
+          2. DOWNGRADE: Create new token with minimal scopes and restart:
+
+             # Create new token with minimal scopes
+             gh auth refresh --scopes "public_repo,read:org"
+
+             # Update workflow parameter and resubmit
+             argo submit --from workflowtemplate/pr-review-workflow \
+               -p gh-token="$(gh auth token)" \
+               -p github-org={{workflow.parameters.github-org}} \
+               -p github-repo={{workflow.parameters.github-repo}}
+
+             # Terminate this workflow
+             argo terminate {{workflow.name}}
+
+          To resume this workflow: argo resume {{workflow.name}}
+    suspend: {}
 
   - name: list-prs
     metadata:
@@ -189,8 +275,8 @@ spec:
       parameters:
       - name: pr-id
     script:
-      image: bitnami/kubectl:latest
-      command: [bash]
+      image: alpine/k8s:1.28.13
+      command: [sh]
       volumeMounts:
       - name: workspace
         mountPath: /workspace
@@ -217,24 +303,17 @@ spec:
           input: |
             Review pull request #${pr_id} in repository {{workflow.parameters.github-org}}/{{workflow.parameters.github-repo}}.
 
-            IMPORTANT: Use the following workflow:
-            1. First, create the workspace directory: use execute-shell-command with 'mkdir' and args ['-p', '${workspace_path}']
-            2. Change to that directory: use execute-shell-command with 'cd' and args ['${workspace_path}']
-            3. Analyze the pull request using GitHub tools
-            4. Write your review to ${workspace_path}/review.md using execute-shell-command with 'bash' and args ['-c', 'cat > ${workspace_path}/review.md << EOF
-            <your review content here>
-            EOF']
+            Analyze the pull request and provide a review in Markdown format.
 
             Your review should include:
             1. PR summary and purpose
             2. Key changes
             3. Potential issues or concerns
             4. Recommendations for reviewers
-
-            Format: Markdown
           targets:
           - type: agent
             name: {{workflow.parameters.agent-name}}
+          sessionId: {{workflow.name}}
           timeout: 10m
           ttl: 24h
         EOF
@@ -243,16 +322,40 @@ spec:
         kubectl wait --for=condition=Completed \
           --timeout=10m query/${query_name}
 
-        # Exit if the query failed.
+        # Check if query failed with rate limit error.
         phase=$(kubectl get query "${query_name}" -o jsonpath='{.status.phase}')
         if [ "${phase}" = "error" ]; then
-          echo "Query failed with error" >&2
-          exit 1
+          error_msg=$(kubectl get query "${query_name}" -o jsonpath='{.status.responses[0].raw}')
+          if echo "${error_msg}" | grep -q "429\|RateLimitReached"; then
+            echo "Rate limit hit, waiting 30s and retrying..." >&2
+            sleep 30
+
+            # Reset query by replacing without status to trigger reprocessing.
+            kubectl get query "${query_name}" -o json | \
+              jq 'del(.status)' | \
+              kubectl replace -f -
+
+            kubectl wait --for=condition=Completed \
+              --timeout=10m query/${query_name}
+            phase=$(kubectl get query "${query_name}" -o jsonpath='{.status.phase}')
+          fi
+
+          # Exit if still failed.
+          if [ "${phase}" = "error" ]; then
+            echo "Query failed with error" >&2
+            exit 1
+          fi
         fi
 
-        # Verify the agent wrote the review to the workspace.
-        [ -d "${workspace_path}" ] || { echo "Workspace directory not found: ${workspace_path}" >&2; exit 1; }
-        [ -f "${workspace_path}/review.md" ] || { echo "Review file not found: ${workspace_path}/review.md" >&2; exit 1; }
+        # Get review content from query response.
+        review_content=$(kubectl get query "${query_name}" -o jsonpath='{.status.responses[0].content}')
+
+        # Create workspace directory and write review.
+        mkdir -p "${workspace_path}"
+        echo "${review_content}" > "${workspace_path}/review.md"
+
+        # Verify file was written.
+        [ -f "${workspace_path}/review.md" ] || { echo "Failed to write review file" >&2; exit 1; }
 
         # Output the review for workflow artifacts.
         cat "${workspace_path}/review.md" | tee /tmp/review-summary.txt
@@ -276,8 +379,8 @@ spec:
       annotations:
         workflows.argoproj.io/description: "Summarize all PR reviews from workspace"
     script:
-      image: bitnami/kubectl:latest
-      command: [bash]
+      image: alpine/k8s:1.28.13
+      command: [sh]
       volumeMounts:
       - name: workspace
         mountPath: /workspace
