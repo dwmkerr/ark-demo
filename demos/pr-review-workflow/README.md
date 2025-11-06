@@ -4,32 +4,32 @@ This workflow reviews all requests in a GitHub repository.
 
 ## Installation
 
+See [Argo Workflows documentation](https://mckinsey.github.io/agents-at-scale-ark/developer-guide/workflows/argo-workflows) for full details.
+
 ```bash
-# Ensure Argo / Ark Workflows is installed.
-pushd ~/repos/github/McK-Internal/agents-at-scale-marketplace/ark-workflows
-devspace deploy
-popd
+# Install Argo Workflows for ARK
+helm upgrade --install argo-workflows \
+  oci://ghcr.io/mckinsey/agents-at-scale-ark/charts/argo-workflows
 
-# Create a PVC to use as a shared workspace.
-kubectl apply -f ./workspace-pvc.yaml
+# Install ark-demo as usual, ensuring shell and GitHub MCP servers are enabled:
+# e.g:
+# make install
 
-# Install the shell MCP server with workspace PVC mounted.
-helm install shell-mcp oci://ghcr.io/dwmkerr/charts/shell-mcp \
-  --set volumes[0].name=workspace \
-  --set volumes[0].persistentVolumeClaim.claimName=github-mcp-workspace \
-  --set volumeMounts[0].name=workspace \
-  --set volumeMounts[0].mountPath=/workspace
+# Then upgrade to add workspace configuration:
+helm upgrade ark-demo oci://ghcr.io/dwmkerr/charts/ark-demo \
+  --set shell-mcp.volumes[0].name=workspace \
+  --set shell-mcp.volumes[0].persistentVolumeClaim.claimName=github-mcp-workspace \
+  --set shell-mcp.volumeMounts[0].name=workspace \
+  --set shell-mcp.volumeMounts[0].mountPath=/workspace \
+  --reuse-values
 
-# Install the GitHub MCP server.
-helm install github-mcp oci://ghcr.io/dwmkerr/charts/github-mcp \
-  --set github.token="$GITHUB_TOKEN"
-
-# Create the PR review agent with all GitHub and shell tools
-kubectl apply -f ./pr-review-agent.yaml
-
-# Create the workflow template.
+# Create the workflow template, agent, and workspace PVC.
 kubectl apply -f ./pr-review-workflow.yaml
+```
 
+## Running the Workflow
+
+```bash
 # To run the workflow, option 1 is to use the argo cli:
 argo submit --from workflowtemplate/pr-review-workflow \
     -p github-org=mckinsey \
@@ -128,3 +128,14 @@ data:
         key: secretKey
 EOF
 ```
+
+# TODO
+
+# Task list
+
+- [ ] attribution
+- [ ] 'since'
+- [ ] service / gateway
+- [ ] GH token -> GH MCP per workflow
+- [ ] Wait on workflow required resources
+- [ ] PVC
