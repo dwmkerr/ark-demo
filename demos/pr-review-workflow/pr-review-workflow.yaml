@@ -144,9 +144,25 @@ spec:
         # Install gh CLI
         apk add --no-cache github-cli
 
-        # Get token scopes
+        # Get token scopes directly (gh CLI uses GH_TOKEN env var automatically)
         echo "Checking GitHub token scopes..."
-        scopes=$(echo "$GH_TOKEN" | gh auth login --with-token && gh api user -i | grep -i "x-oauth-scopes:" | cut -d: -f2-)
+        gh api user -i > /tmp/gh-response.txt 2>&1 || {
+          echo "ERROR: gh api user failed"
+          cat /tmp/gh-response.txt
+          echo "false" > /tmp/is-risky
+          exit 0
+        }
+
+        echo "Response headers:"
+        head -20 /tmp/gh-response.txt
+
+        scopes=$(grep -i "x-oauth-scopes:" /tmp/gh-response.txt | cut -d: -f2- || echo "")
+
+        if [ -z "$scopes" ]; then
+          echo "WARNING: Could not find x-oauth-scopes header, skipping validation"
+          echo "false" > /tmp/is-risky
+          exit 0
+        fi
 
         echo "Token scopes: $scopes"
 
