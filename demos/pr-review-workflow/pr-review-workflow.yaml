@@ -56,31 +56,29 @@ spec:
 
       - name: check-token-scopes
         template: check-token-scopes
-        dependencies: [prepare-workflow]
+        depends: "prepare-workflow"
 
       - name: suspend-if-risky
         template: suspend-token-warning
-        dependencies: [check-token-scopes]
+        depends: "check-token-scopes"
         when: "{{tasks.check-token-scopes.outputs.parameters.is-risky}} == true"
 
       - name: list-prs
         template: list-prs
-        dependencies: [check-token-scopes]
+        depends: "suspend-if-risky.Skipped || suspend-if-risky.Succeeded"
 
       - name: review-prs
         template: review-pr
-        dependencies: [list-prs]
+        depends: "list-prs"
         arguments:
           parameters:
           - name: pr-id
             value: "{{item}}"
         withParam: "{{tasks.list-prs.outputs.parameters.result}}"
-        continueOn:
-          failed: true
 
       - name: summarize-reviews
         template: summarize-reviews
-        dependencies: [review-prs]
+        depends: "review-prs.Succeeded || review-prs.Failed"
 
   - name: prepare-workflow
     metadata:
