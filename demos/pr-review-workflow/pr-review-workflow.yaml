@@ -51,16 +51,20 @@ spec:
   - name: main
     dag:
       tasks:
+        # TODO rename to 'prepare and validate'. A summary of the configuration should be written to an artifact for later review.
       - name: prepare-workflow
         template: prepare-workflow
 
+        # TODO: let's put this in the previous step and output 'risky permissions' into a file, the summary of risky permissions can be written to a file in the previous step, this step should write something like 'the following steps have been approved: X, Y, Z, with the following configuraiton: A, B,. C - but keep this very very simple. A summary of the approval should be written to an artifact for later review.
       - name: check-token-scopes
         template: check-token-scopes
         depends: "prepare-workflow"
 
+      # TODO: suspend if dangerous
       - name: suspend-if-risky
         template: suspend-token-warning
         depends: "check-token-scopes"
+          # TODO: store the actual scopes, space separated, 'dangerous_scopes' can we do that?
         when: "{{tasks.check-token-scopes.outputs.parameters.is-risky}} == true"
 
       - name: list-prs
