@@ -85,28 +85,29 @@ spec:
       env:
       - name: GH_TOKEN
         value: "{{workflow.parameters.gh-token}}"
+      volumeMounts:
+      - name: file-templates
+        mountPath: /templates
       source: |
         set -e -o pipefail
 
         plan_file="/tmp/workflow-plan.md"
 
-        # Write workflow plan header
-        cat > "${plan_file}" <<EOF
-# PR Review Workflow Plan
+        # Generate workflow plan from template using envsubst
+        export GITHUB_ORG="{{workflow.parameters.github-org}}"
+        export GITHUB_REPO="{{workflow.parameters.github-repo}}"
+        export AGENT_NAME="{{workflow.parameters.agent-name}}"
+        export WORKSPACE_PVC="{{workflow.parameters.workspace-pvc-name}}"
+        export UPDATED_SINCE="{{workflow.parameters.updated-since}}"
+        export PR_IDS="{{workflow.parameters.pr-ids}}"
+        export COMMENT_ON_PR="{{workflow.parameters.comment-on-pr}}"
+        if [ -n "{{workflow.parameters.gh-token}}" ]; then
+          export GH_TOKEN_STATUS="provided"
+        else
+          export GH_TOKEN_STATUS="not provided"
+        fi
 
-## Workflow Configuration
-- Organization: {{workflow.parameters.github-org}}
-- Repository: {{workflow.parameters.github-repo}}
-- Agent: {{workflow.parameters.agent-name}}
-- Workspace PVC: {{workflow.parameters.workspace-pvc-name}}
-
-## Parameters
-- Updated Since: {{workflow.parameters.updated-since}}
-- PR IDs: {{workflow.parameters.pr-ids}}
-- Comment on PR: {{workflow.parameters.comment-on-pr}}
-- GitHub Token: $([ -n "{{workflow.parameters.gh-token}}" ] && echo "provided" || echo "not provided")
-
-EOF
+        envsubst < /templates/workflow-plan.md > "${plan_file}"
 
         # Check that gh-token is provided if PR commenting is enabled.
         comment_on_pr="{{workflow.parameters.comment-on-pr}}"
@@ -222,6 +223,10 @@ EOF
         path: /tmp/workflow-plan.md
         archive:
           none: {}
+    volumes:
+    - name: file-templates
+      configMap:
+        name: pr-review-file-templates
 
   - name: request-approval
     metadata:
@@ -547,3 +552,26 @@ spec:
     type: custom
   - name: shell-mcp-execute-shell-command
     type: custom
+---
+# ConfigMap containing the workflow plan template.
+# The template uses shell variable syntax (${VAR}) which gets replaced
+# by envsubst in the prepare-and-validate step.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pr-review-file-templates
+data:
+  workflow-plan.md: |
+    # PR Review Workflow Plan
+
+    ## Workflow Configuration
+    - Organization: ${GITHUB_ORG}
+    - Repository: ${GITHUB_REPO}
+    - Agent: ${AGENT_NAME}
+    - Workspace PVC: ${WORKSPACE_PVC}
+
+    ## Parameters
+    - Updated Since: ${UPDATED_SINCE}
+    - PR IDs: ${PR_IDS}
+    - Comment on PR: ${COMMENT_ON_PR}
+    - GitHub Token: ${GH_TOKEN_STATUS}
