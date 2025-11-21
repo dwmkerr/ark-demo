@@ -24,7 +24,7 @@ spec:
       description: "GitHub repository name"
 
     - name: workspace-pvc-name
-      value: "github-mcp-workspace"
+      value: "pr-review-workflow-workspace"
       description: "Name of the PVC to use for workspace"
 
     - name: agent-name
@@ -444,7 +444,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: github-mcp-workspace
+  name: pr-review-workflow-workspace
 spec:
   accessModes:
     - ReadWriteMany
