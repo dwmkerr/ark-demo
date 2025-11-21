@@ -51,25 +51,16 @@ spec:
   - name: main
     dag:
       tasks:
-        # TODO rename to 'prepare and validate'. A summary of the configuration should be written to an artifact for later review.
-      - name: prepare-workflow
-        template: prepare-workflow
+      - name: prepare-and-validate
+        template: prepare-and-validate
 
-        # TODO: let's put this in the previous step and output 'risky permissions' into a file, the summary of risky permissions can be written to a file in the previous step, this step should write something like 'the following steps have been approved: X, Y, Z, with the following configuraiton: A, B,. C - but keep this very very simple. A summary of the approval should be written to an artifact for later review.
-      - name: check-token-scopes
-        template: check-token-scopes
-        depends: "prepare-workflow"
-
-      # TODO: suspend if dangerous
-      - name: suspend-if-risky
-        template: suspend-token-warning
-        depends: "check-token-scopes"
-          # TODO: store the actual scopes, space separated, 'dangerous_scopes' can we do that?
-        when: "{{tasks.check-token-scopes.outputs.parameters.is-risky}} == true"
+      - name: request-approval
+        template: request-approval
+        depends: "prepare-and-validate"
 
       - name: list-prs
         template: list-prs
-        depends: "suspend-if-risky.Skipped || suspend-if-risky.Succeeded"
+        depends: "request-approval"
 
       - name: review-prs
         template: review-pr
@@ -84,15 +75,38 @@ spec:
         template: summarize-reviews
         depends: "review-prs.Succeeded || review-prs.Failed"
 
-  - name: prepare-workflow
+  - name: prepare-and-validate
     metadata:
       annotations:
         workflows.argoproj.io/description: "Validate workflow parameters and prerequisites"
     script:
       image: alpine/k8s:1.28.13
       command: [sh]
+      env:
+      - name: GH_TOKEN
+        value: "{{workflow.parameters.gh-token}}"
       source: |
         set -e -o pipefail
+
+        plan_file="/tmp/workflow-plan.md"
+
+        # Write workflow plan header
+        cat > "${plan_file}" <<EOF
+# PR Review Workflow Plan
+
+## Workflow Configuration
+- Organization: {{workflow.parameters.github-org}}
+- Repository: {{workflow.parameters.github-repo}}
+- Agent: {{workflow.parameters.agent-name}}
+- Workspace PVC: {{workflow.parameters.workspace-pvc-name}}
+
+## Parameters
+- Updated Since: {{workflow.parameters.updated-since}}
+- PR IDs: {{workflow.parameters.pr-ids}}
+- Comment on PR: {{workflow.parameters.comment-on-pr}}
+- GitHub Token: $([ -n "{{workflow.parameters.gh-token}}" ] && echo "provided" || echo "not provided")
+
+EOF
 
         # Check that gh-token is provided if PR commenting is enabled.
         comment_on_pr="{{workflow.parameters.comment-on-pr}}"
@@ -108,133 +122,123 @@ spec:
         pvc_name="{{workflow.parameters.workspace-pvc-name}}"
         echo "checking workflow pvc '${pvc_name}'..."
         kubectl get pvc "${pvc_name}"
+        echo "✓ Workspace PVC: ${pvc_name}" >> "${plan_file}"
 
         # Verify required MCP servers are installed.
+        echo "" >> "${plan_file}"
+        echo "## Required MCP Servers" >> "${plan_file}"
         mcp_servers="github shell-mcp"
         for mcp_server in ${mcp_servers}; do
           echo "checking mcp server '${mcp_server}'..."
           kubectl get mcpserver "${mcp_server}"
+          echo "✓ ${mcp_server}" >> "${plan_file}"
         done
 
         # Verify the PR review agent exists.
         agent_name="{{workflow.parameters.agent-name}}"
         echo "checking agent '${agent_name}'..."
         kubectl get agent "${agent_name}"
+        echo "" >> "${plan_file}"
+        echo "## Agent Configuration" >> "${plan_file}"
+        echo "✓ Agent: ${agent_name}" >> "${plan_file}"
+
+        # Write workflow actions
+        echo "" >> "${plan_file}"
+        echo "## Planned Actions" >> "${plan_file}"
+        if [ -n "{{workflow.parameters.pr-ids}}" ]; then
+          echo "- Review specific PRs: {{workflow.parameters.pr-ids}}" >> "${plan_file}"
+        else
+          echo "- Review all open PRs updated since {{workflow.parameters.updated-since}}" >> "${plan_file}"
+        fi
+
+        if [ "${comment_on_pr}" = "true" ]; then
+          echo "- Post review comments to PRs (enabled)" >> "${plan_file}"
+        else
+          echo "- Read-only review (commenting disabled)" >> "${plan_file}"
+        fi
+
+        # Check token scopes for dangerous permissions
+        echo "" >> "${plan_file}"
+        echo "## Token Permissions" >> "${plan_file}"
+
+        dangerous_scopes_found=""
+
+        if [ -z "$GH_TOKEN" ]; then
+          echo "- No GitHub token provided" >> "${plan_file}"
+        else
+          # Install gh CLI
+          apk add --no-cache github-cli >/dev/null 2>&1
+
+          # Get token scopes
+          echo "Checking GitHub token scopes..."
+          if gh api user -i > /tmp/gh-response.txt 2>&1; then
+            scopes=$(grep -i "x-oauth-scopes:" /tmp/gh-response.txt | cut -d: -f2- | xargs || echo "")
+
+            if [ -n "$scopes" ]; then
+              echo "Token scopes: $scopes"
+
+              # Define dangerous scopes
+              dangerous_list="repo delete_repo admin:org admin:public_key admin:repo_hook admin:gpg_key workflow"
+
+              # Check each dangerous scope
+              for dangerous_scope in $dangerous_list; do
+                if echo "$scopes" | grep -qw "$dangerous_scope"; then
+                  echo "⚠️  FOUND: Token has '$dangerous_scope' scope"
+                  if [ -z "$dangerous_scopes_found" ]; then
+                    dangerous_scopes_found="$dangerous_scope"
+                  else
+                    dangerous_scopes_found="$dangerous_scopes_found,$dangerous_scope"
+                  fi
+                fi
+              done
+
+              if [ -n "$dangerous_scopes_found" ]; then
+                echo "- ⚠️  **Elevated permissions detected:** \`$dangerous_scopes_found\`" >> "${plan_file}"
+                echo "- These scopes exceed what's needed for PR reviews" >> "${plan_file}"
+                echo "- **Recommended scopes:** \`public_repo,read:org\`" >> "${plan_file}"
+              else
+                echo "- ✓ Token scopes are appropriate for PR reviews" >> "${plan_file}"
+              fi
+            else
+              echo "- WARNING: Could not determine token scopes" >> "${plan_file}"
+            fi
+          else
+            echo "- WARNING: Failed to validate token scopes" >> "${plan_file}"
+          fi
+        fi
+
+        # Save dangerous scopes for output parameter
+        echo "$dangerous_scopes_found" > /tmp/dangerous-scopes.txt
 
         echo "Workflow parameters and prerequisites validated successfully"
-
-  - name: check-token-scopes
-    metadata:
-      annotations:
-        workflows.argoproj.io/description: "Check GitHub token for risky scopes"
-    script:
-      image: alpine/k8s:1.28.13
-      command: [sh]
-      env:
-      - name: GH_TOKEN
-        value: "{{workflow.parameters.gh-token}}"
-      source: |
-        set -e -o pipefail
-
-        # Skip check if no token provided
-        if [ -z "$GH_TOKEN" ]; then
-          echo "No GitHub token provided, skipping scope check"
-          echo "false" > /tmp/is-risky
-          exit 0
-        fi
-
-        # Install gh CLI
-        apk add --no-cache github-cli
-
-        # Get token scopes directly (gh CLI uses GH_TOKEN env var automatically)
-        echo "Checking GitHub token scopes..."
-        gh api user -i > /tmp/gh-response.txt 2>&1 || {
-          echo "ERROR: gh api user failed"
-          cat /tmp/gh-response.txt
-          echo "false" > /tmp/is-risky
-          exit 0
-        }
-
-        echo "Response headers:"
-        head -20 /tmp/gh-response.txt
-
-        scopes=$(grep -i "x-oauth-scopes:" /tmp/gh-response.txt | cut -d: -f2- || echo "")
-
-        if [ -z "$scopes" ]; then
-          echo "WARNING: Could not find x-oauth-scopes header, skipping validation"
-          echo "false" > /tmp/is-risky
-          exit 0
-        fi
-
-        echo "Token scopes: $scopes"
-
-        # Define dangerous scopes (one per line)
-        cat > /tmp/dangerous-scopes <<'SCOPELIST'
-        repo
-        delete_repo
-        admin:org
-        admin:public_key
-        admin:repo_hook
-        admin:gpg_key
-        workflow
-        SCOPELIST
-
-        # Check each dangerous scope
-        is_risky="false"
-        while read -r dangerous_scope; do
-          # Trim whitespace
-          dangerous_scope=$(echo "$dangerous_scope" | xargs)
-          [ -z "$dangerous_scope" ] && continue
-
-          if echo "$scopes" | grep -qw "$dangerous_scope"; then
-            echo "⚠️  FOUND: Token has '$dangerous_scope' scope"
-            is_risky="true"
-          fi
-        done < /tmp/dangerous-scopes
-
-        # Output result as parameter
-        echo "$is_risky"
-        echo "$is_risky" > /tmp/is-risky
-
-        if [ "$is_risky" = "true" ]; then
-          echo "Token has elevated permissions - workflow will suspend for review"
-        else
-          echo "✓ Token scopes are appropriate"
-        fi
+        cat "${plan_file}"
     outputs:
       parameters:
-      - name: is-risky
+      - name: dangerous-scopes
         valueFrom:
-          path: /tmp/is-risky
+          path: /tmp/dangerous-scopes.txt
+      artifacts:
+      - name: workflow-plan
+        path: /tmp/workflow-plan.md
+        archive:
+          none: {}
 
-  - name: suspend-token-warning
+  - name: request-approval
     metadata:
       annotations:
         workflows.argoproj.io/description: |
-          ⚠️  TOKEN SECURITY WARNING
+          Review and approve the workflow plan before proceeding.
 
-          This GitHub token has elevated scopes that exceed what's needed for PR reviews.
+          The workflow plan includes:
+          - Repository and configuration details
+          - Token permissions (including any elevated scopes)
+          - Validated resources
+          - Planned actions
 
-          CURRENT ISSUE: Token includes 'repo', 'delete_repo', 'admin:org', or 'workflow' scopes
-          RECOMMENDED SCOPES: public_repo, read:org
+          Review the 'workflow-plan' artifact to see the complete plan.
 
-          OPTIONS:
-          1. CONTINUE: Resume workflow to proceed with current token (not recommended)
-          2. DOWNGRADE: Create new token with minimal scopes and restart:
-
-             # Create new token with minimal scopes
-             gh auth refresh --scopes "public_repo,read:org"
-
-             # Update workflow parameter and resubmit
-             argo submit --from workflowtemplate/pr-review-workflow \
-               -p gh-token="$(gh auth token)" \
-               -p github-org={{workflow.parameters.github-org}} \
-               -p github-repo={{workflow.parameters.github-repo}}
-
-             # Terminate this workflow
-             argo terminate {{workflow.name}}
-
-          To resume this workflow: argo resume {{workflow.name}}
+          To approve and continue: argo resume {{workflow.name}}
+          To reject and terminate: argo terminate {{workflow.name}}
     suspend: {}
 
   - name: list-prs

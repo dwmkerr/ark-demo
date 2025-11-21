@@ -2,17 +2,21 @@
 
 This workflow demonstrates the orchestration of a pull-request review process against configurable guidelines for a GitHub process.
 
-This demonstrates a combination of agentic and procedural/deterministic operations, along the way highlighting a number of [Ark](https://github.com/mckinsey/agents-at-scale/ark) and Argo capabilities, such as: validation of configuration, risk-management for credentials, human-in-the-loop approval, recording of actions for audit/forensics, file-management and isolation across a workflow, procedural/deterministic operations, fan-out of work across multiple parallel steps, agentic operations, agentic attribution or 'breadcrumbs', telemetry across complex processes and more.
+This demonstrates a combination of agentic and procedural/deterministic operations, along the way highlighting a number of [Ark](https://github.com/mckinsey/agents-at-scale/ark) and Argo capabilities, such as: validation of configuration, risk-management for credentials, running workflow steps in isolated and customised containers, human-in-the-loop approval, recording of actions for audit/forensics, file-management and isolation across a workflow, procedural/deterministic operations, fan-out of work across multiple parallel steps, agentic operations, agentic attribution or 'breadcrumbs', telemetry across complex processes and more.
 
 Along this way, a number of [good practices and risk management considerations](TODO) are highlighted, and described in more detail in this write-up. [Minio](https://www.min.io/)[^1]TODO is used for file-storage - for enterprise environments this can be switched to Amazon S3, Google Cloud Storage, etc.
+
+TODO session id
+TODO note claude upcoming
 
 <!-- vim-markdown-toc GFM -->
 
 - [Overview](#overview)
 - [Installation](#installation)
 - [Running the Workflow](#running-the-workflow)
+- [Inspecting Output, Reports and Artifacts](#inspecting-output-reports-and-artifacts)
 - [Viewing Telemetry Data](#viewing-telemetry-data)
-- [Inspecting Files and Artifacts](#inspecting-files-and-artifacts)
+- [TODO](#todo)
 
 <!-- vim-markdown-toc -->
 
@@ -61,40 +65,54 @@ First, ensure that [Ark](http://github.com/mckinsey/agents-at-scale-ark) is inst
 # Install the Ark CLI (Node.JS and NPM required).
 npm install -g @agents-at-scale/ark
 
-# Install Ark (and optionally check Ark status post-install).
+# Install Ark. Wait for up to 5m for ark to be ready.
 ark install
-ark status
+ark status --wait-for-ready=5m
+
+# Use the dashboard to configure a default model (or check the docs).
+ark dashboard
 ```
 
-Then install [Argo Workflows for Ark](https://mckinsey.github.io/agents-at-scale-ark/developer-guide/workflows/argo-workflows), along with [Minio as an Artifact Repository](https://argo-workflows.readthedocs.io/en/latest/configure-artifact-repository/#configuring-minio) for artifact storage. Note that at a later date Argo will be optionally installed as part of the main Ark installation and this step will not be required:
+You must have a default model configured, run `ark dashboard` and follow the instructions, or check [the docs](https://mckinsey.github.io/agents-at-scale-ark/quickstart/).
+
+Now install [Argo Workflows for Ark](https://mckinsey.github.io/agents-at-scale-ark/developer-guide/workflows/argo-workflows), along with [Minio as an Artifact Repository](https://argo-workflows.readthedocs.io/en/latest/configure-artifact-repository/#configuring-minio) for artifact storage. Note that at a later date Argo will be optionally installed as part of the main Ark installation and this step will not be required:
 
 ```bash
-TODO install argo
-TODO install minio
-# Install Argo Workflows for ARK
-helm upgrade --install argo-workflows \
-  oci://ghcr.io/mckinsey/agents-at-scale-ark/charts/argo-workflows
-# Install the minio operator.
-helm repo add minio https://charts.min.io/ # official minio Helm charts
-helm repo update
+# First install Minio, which will be used for file storage.
+helm upgrade minio-operator operator \
+  --install \
+  --repo https://operator.min.io \
+  --namespace minio-operator \
+  --create-namespace \
+  --version 7.1.1
 
-# Install the minio tenant.
-helm upgrade --install minio-tenant minio-operator/tenant
+# Now install Argo workflows, with minio enabled.
+helm upgrade argo-workflows \
+  oci://ghcr.io/mckinsey/agents-at-scale-ark/charts/argo-workflows \
+  --install \
+  --set minio.enabled=true
 
-# Get the username / password. Defaults to:
+# These services can take a while to install, check the status with:
+kubectl get tenant                                           # will show 'green'
+kubectl get pods -n minio-operator                           # will show 'ready'
+kubectl get pods -l app.kubernetes.io/part-of=argo-workflows # will show 'ready'
+```
+
+You can now check the Argo Workflows dashboard as well as the Minio dashboard:
+
+```bash
+# Show the Argo Workflows dashboard:
+kubectl port-forward svc/argo-workflows-server 2746:2746
+# http://localhost:2746
+
+# Show the minio dashboard:
+kubectl port-forward svc/myminio-console 9443:9443
+# https://localhost:9443
 # Username: minio
 # Password: minio123
-username="$(kubectl get secret myminio-env-configuration \
-    -o jsonpath='{.data.config\.env}' | base64 -d |\
-    grep MINIO_ROOT_USER | cut -d'"' -f2)"
-password="$(kubectl get secret myminio-env-configuration \
-    -o jsonpath='{.data.config\.env}' | base64 -d |\
-    grep MINIO_ROOT_PASSWORD | cut -d'"' -f2)"
-echo "Minio root user:"
-echo "  username: ${username}"
-echo "  password: ${password}"
-
 ```
+
+**TODO**
 
 Install required MCP servers and Ark resources. These must be configured to use a shared file-system so that files can be shared between steps of the workflow (more detailed descriptions of workflow and MCP file management are being added to the Ark documentation and best-practices):
 
@@ -112,7 +130,8 @@ helm upgrade ark-demo oci://ghcr.io/dwmkerr/charts/ark-demo \
   --reuse-values
 ```
 
-TODO telemetry
+TODO telemetry phoenix kubectl port-forward -n phoenix svc/phoenix-svc 6006:6006
+
 
 Install the workflow itself:
 
@@ -138,9 +157,10 @@ kubectl port-forward 2746:2746 &
 open http://localhost:2746
 ```
 
+## Inspecting Output, Reports and Artifacts
+
 ## Viewing Telemetry Data
 
-## Inspecting Files and Artifacts
 
 TODO S3 CLI
 
@@ -158,7 +178,8 @@ kubectl create secret generic minio-credentials \
 # below.
 namespace="$(kubectl config view --minify -o jsonpath='{.contexts[0].context.namespace}')"
 namespace="${namespace:-default}"
-TODO Dashboard
-
-# TODO
 ```
+
+## TODO
+TODO Dashboard
+any way to pull out scripts? configmap?
