@@ -2,21 +2,20 @@
 
 This workflow demonstrates the orchestration of a pull-request review process against configurable guidelines for a GitHub process.
 
-This demonstrates a combination of agentic and procedural/deterministic operations, along the way highlighting a number of [Ark](https://github.com/mckinsey/agents-at-scale/ark) and Argo capabilities, such as: validation of configuration, risk-management for credentials, running workflow steps in isolated and customised containers, human-in-the-loop approval, recording of actions for audit/forensics, file-management and isolation across a workflow, procedural/deterministic operations, fan-out of work across multiple parallel steps, agentic operations, agentic attribution or 'breadcrumbs', telemetry across complex processes and more.
+This demonstrates a combination of agentic and procedural/deterministic operations, along the way highlighting a number of [Ark](https://github.com/mckinsey/agents-at-scale/ark) and Argo capabilities, such as: validation of configuration, risk-management for credentials, running workflow steps in isolated and customised containers, human-in-the-loop approval, recording of actions for audit/forensics, procedural/deterministic operations, fan-out of work across multiple parallel steps, agentic operations, agentic attribution or 'breadcrumbs', session management and telemetry across complex processes and more.
 
 Along this way, a number of [good practices and risk management considerations](TODO) are highlighted, and described in more detail in this write-up. [Minio](https://www.min.io/)[^1]TODO is used for file-storage - for enterprise environments this can be switched to Amazon S3, Google Cloud Storage, etc.
 
-TODO session id
-TODO note claude upcoming
-
 <!-- vim-markdown-toc GFM -->
 
-- [Overview](#overview)
-- [Installation](#installation)
-- [Running the Workflow](#running-the-workflow)
-- [Inspecting Output, Reports and Artifacts](#inspecting-output-reports-and-artifacts)
-- [Viewing Telemetry Data](#viewing-telemetry-data)
-- [TODO](#todo)
+    - [Overview](#overview)
+    - [Installation](#installation)
+    - [Running the Workflow](#running-the-workflow)
+    - [Inspecting Output, Reports and Artifacts](#inspecting-output-reports-and-artifacts)
+    - [Final Thoughts](#final-thoughts)
+    - [Viewing Telemetry Data](#viewing-telemetry-data)
+    - [TODO](#todo)
+- [Troubleshooting](#troubleshooting)
 
 <!-- vim-markdown-toc -->
 
@@ -112,31 +111,27 @@ kubectl port-forward svc/myminio-console 9443:9443
 # Password: minio123
 ```
 
-**TODO**
-
-Install required MCP servers and Ark resources. These must be configured to use a shared file-system so that files can be shared between steps of the workflow (more detailed descriptions of workflow and MCP file management are being added to the Ark documentation and best-practices):
+Optionally install a telemetry service such as [Langfuse](https://mckinsey.github.io/agents-at-scale-marketplace/services/langfuse/) or [Phoenix](https://mckinsey.github.io/agents-at-scale-marketplace/services/phoenix/). As an example for Langfuse:
 
 ```bash
-TODO install X   # comment why
-# Install ark-demo as usual, ensuring shell and GitHub MCP servers are enabled:
-# e.g:
-# make install
-# Then upgrade to add workspace configuration:
-helm upgrade ark-demo oci://ghcr.io/dwmkerr/charts/ark-demo \
-  --set shell-mcp.volumes[0].name=workspace \
-  --set shell-mcp.volumes[0].persistentVolumeClaim.claimName=github-mcp-workspace \
-  --set shell-mcp.volumeMounts[0].name=workspace \
-  --set shell-mcp.volumeMounts[0].mountPath=/workspace \
-  --reuse-values
+# Install langfuse, wait for it to be ready (this can take 5-10 mins), then open
+# the dashboard.
+ark install marketplace/services/langfuse
+kubectl wait --for=condition=Available -n telemetry deployment/langfuse-web
+kubectl port-forward -n telemetry services/langfuse-web 3000:3000
+# https://localhost:3000
+# Username: password123
 ```
 
-TODO telemetry phoenix kubectl port-forward -n phoenix svc/phoenix-svc 6006:6006
+Install the Pull Request Review workflow, as well as the GitHub MCP server which it depends upon:
 
+```bash
+# Install the GitHub MCP server with your GitHub token.
+helm upgrade --install github-mcp oci://ghcr.io/dwmkerr/charts/github-mcp \
+  --set github.token=${GITHUB_TOKEN}
 
-Install the workflow itself:
-
-```
-kubectl apply -f ./pr-review-workflow.yaml
+# Install the Pull Request Review workflow.
+kubectl apply -f https://raw.githubusercontent.com/dwmkerr/ark-demo/refs/heads/main/demos/pr-review-workflow/pr-review-workflow.yaml
 ```
 
 ## Running the Workflow
@@ -158,6 +153,10 @@ open http://localhost:2746
 ```
 
 ## Inspecting Output, Reports and Artifacts
+
+## Final Thoughts
+
+TODO note claude upcoming
 
 ## Viewing Telemetry Data
 
@@ -183,3 +182,21 @@ namespace="${namespace:-default}"
 ## TODO
 TODO Dashboard
 any way to pull out scripts? configmap?
+TODO session id
+TODO eliminate 
+
+**Bugs/Must-Fix**
+
+- [ ] Argo/Minio bug - artifact repository not automatically configured https://github.com/mckinsey/agents-at-scale-ark/pull/482
+- [ ] Services via ark cli
+- [ ] langfuse not restarting
+
+**Nice-to-have**
+
+- [ ] Show Langfuse/Phoenix output: https://github.com/mckinsey/agents-at-scale-marketplace/pull/64
+- [ ] Show `ark install marketplace/` commands in docs https://github.com/mckinsey/agents-at-scale-marketplace/issues/63
+- [ ] Allow 'retries' or similar for queries (e.g. to handle rate-limit errors).
+
+# Troubleshooting
+
+- TODO: github token, check the GH mcp server logs / conditions
