@@ -50,6 +50,9 @@ spec:
     - name: comment-on-pr
       value: "false"
       description: "If true, post review comments to PRs. Requires gh-token to be set."
+      enum:
+        - "true"
+        - "false"
 
 
   templates:
