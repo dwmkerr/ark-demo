@@ -110,6 +110,7 @@ spec:
         export UPDATED_SINCE="{{workflow.parameters.updated-since}}"
         export PR_IDS="{{workflow.parameters.pr-ids}}"
         export COMMENT_ON_PR="{{workflow.parameters.comment-on-pr}}"
+        export WORKFLOW_NAME="{{workflow.name}}"
         gh_token="{{workflow.parameters.gh-token}}"
         if [ -n "$gh_token" ]; then
           export GH_TOKEN_DISPLAY="$(printf '%*s' $((${#gh_token} - 3)) '' | tr ' ' '*')${gh_token: -3}"
@@ -365,25 +366,26 @@ spec:
     2. Cloning repositories and checking out specific PRs
     3. Analyzing code changes
 
+  # Add tools needed to clone/review/etc.
   tools:
   - name: github-add-comment-to-pending-review
     type: custom
   - name: github-add-issue-comment
     type: custom
-  - name: github-assign-copilot-to-issue
-    type: custom
-  - name: github-create-branch
-    type: custom
-  - name: github-create-or-update-file
-    type: custom
-  - name: github-create-pull-request
-    type: custom
-  - name: github-create-repository
-    type: custom
-  - name: github-delete-file
-    type: custom
-  - name: github-fork-repository
-    type: custom
+  # - name: github-assign-copilot-to-issue
+  #   type: custom
+  # - name: github-create-branch
+  #   type: custom
+  # - name: github-create-or-update-file
+  #   type: custom
+  # - name: github-create-pull-request
+  #   type: custom
+  # - name: github-create-repository
+  #   type: custom
+  # - name: github-delete-file
+  #   type: custom
+  # - name: github-fork-repository
+  #   type: custom
   - name: github-get-commit
     type: custom
   - name: github-get-file-contents
@@ -404,8 +406,8 @@ spec:
     type: custom
   - name: github-issue-read
     type: custom
-  - name: github-issue-write
-    type: custom
+  # - name: github-issue-write
+  #   type: custom
   - name: github-list-branches
     type: custom
   - name: github-list-commits
@@ -420,8 +422,8 @@ spec:
     type: custom
   - name: github-list-tags
     type: custom
-  - name: github-merge-pull-request
-    type: custom
+  # - name: github-merge-pull-request
+  #   type: custom
   - name: github-pull-request-read
     type: custom
   - name: github-pull-request-review-write
@@ -442,10 +444,10 @@ spec:
     type: custom
   - name: github-sub-issue-write
     type: custom
-  - name: github-update-pull-request
-    type: custom
-  - name: github-update-pull-request-branch
-    type: custom
+  # - name: github-update-pull-request
+  #   type: custom
+  # - name: github-update-pull-request-branch
+  #   type: custom
 ---
 # ConfigMap containing the workflow plan template.
 # The template uses shell variable syntax (${VAR}) which gets replaced
@@ -467,3 +469,17 @@ data:
     - PR IDs: ${PR_IDS}
     - Comment on PR: ${COMMENT_ON_PR}
     - GitHub Token: ${GH_TOKEN_DISPLAY}
+
+    ## Approval Required
+
+    Review this plan before proceeding.
+
+    To approve and continue:
+    ```sh
+    argo resume ${WORKFLOW_NAME}
+    ```
+
+    To reject and terminate:
+    ```sh
+    argo terminate ${WORKFLOW_NAME}
+    ```
