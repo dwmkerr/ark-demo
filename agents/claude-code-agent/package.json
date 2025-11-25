@@ -12,6 +12,8 @@
     "build": "tsc",
     "start": "node dist/main.js",
     "dev": "tsx watch src/main.ts",
+    "dev:debug": "DEBUG=* tsx watch src/main.ts",
+    "test": "jest",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix"
   },
@@ -26,18 +28,24 @@
   "dependencies": {
     "@a2a-js/sdk": "^0.3.4",
     "@anthropic-ai/sdk": "^0.32.1",
+    "chalk": "^5.6.2",
+    "debug": "^4.4.3",
     "dotenv": "^16.4.5",
     "execa": "^9.6.0",
     "express": "^5.1.0",
     "uuid": "^9.0.0"
   },
   "devDependencies": {
+    "@types/debug": "^4.1.12",
     "@types/express": "^4.17.21",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20.11.19",
     "@types/uuid": "^9.0.0",
     "@typescript-eslint/eslint-plugin": "^8.45.0",
     "@typescript-eslint/parser": "^8.45.0",
     "eslint": "^8.56.0",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.5",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"
   }

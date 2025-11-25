@@ -2,6 +2,7 @@ version: v2beta1
 
 vars:
   ANTHROPIC_API_KEY:
+    source: input
     question: "Enter your Anthropic API key:"
 
 images:
@@ -12,7 +13,7 @@ images:
 
 hooks:
   - name: create-anthropic-secret
-    events: ["before:deploy"]
+    events: ["before:deploy", "before:dev"]
     command: |-
       if [ -z "${ANTHROPIC_API_KEY}" ]; then
         echo "Error: ANTHROPIC_API_KEY is required"
@@ -55,7 +56,7 @@ dev:
 
         npm install
         mkdir -p ~/.claude/skills
-        ln -sf /app/.claude/skills/* ~/.claude/skills/ 2>/dev/null || true
+        ln -sf /app/skills/* ~/.claude/skills/ 2>/dev/null || true
 
         npm run dev
     logs:

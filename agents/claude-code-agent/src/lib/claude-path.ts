@@ -1,5 +1,5 @@
 import { spawnSync } from 'child_process';
-import { readlinkSync } from 'fs';
+import { realpathSync } from 'fs';
 import createDebug from 'debug';
 
 const debug = createDebug('claude:cli');
@@ -24,13 +24,13 @@ export function findClaudePath(env: NodeJS.ProcessEnv = process.env): string | u
 
   const claudeSymlink = whichResult.stdout.trim();
 
-  // Check if it's a symlink and resolve it
+  // Resolve symlinks to absolute path
   try {
-    const realPath = readlinkSync(claudeSymlink);
-    debug('Found Claude at: %s (symlink to %s)', claudeSymlink, realPath);
+    const realPath = realpathSync(claudeSymlink);
+    debug('Found Claude at: %s (resolved to %s)', claudeSymlink, realPath);
     return realPath;
   } catch {
-    // Not a symlink, use as is
+    // Can't resolve, use as is
     debug('Found Claude at: %s', claudeSymlink);
     return claudeSymlink;
   }

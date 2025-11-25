@@ -17,7 +17,7 @@ RUN npm ci --only=production
 
 COPY tsconfig.json ./
 COPY src/ ./src/
-COPY .claude/ /home/ark/.claude/
+COPY skills/ /home/ark/.claude/skills/
 
 RUN npm run build
 

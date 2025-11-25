@@ -27,5 +27,13 @@ export function setupA2ARoutes(app: Express, host: string, port: number): void {
 
   // Create A2A Express app and setup routes on main app
   const a2aApp = new A2AExpressApp(requestHandler);
-  a2aApp.setupRoutes(app);
+
+  // Simple request logging middleware
+  const loggingMiddleware = (req: any, _res: any, next: any) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] ${req.method} ${req.path}`);
+    next();
+  };
+
+  a2aApp.setupRoutes(app, '', [loggingMiddleware]);
 }

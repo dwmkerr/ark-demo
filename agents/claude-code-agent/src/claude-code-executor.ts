@@ -1,7 +1,6 @@
 import { execa, execaNode } from 'execa';
-import { spawnSync } from 'child_process';
-import { resolve, dirname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import chalk from 'chalk';
 import { Task } from '@a2a-js/sdk';
 import {
   AgentExecutor,
@@ -9,6 +8,10 @@ import {
   ExecutionEventBus,
 } from '@a2a-js/sdk/server';
 import { Kind, Role, TaskState } from './protocol.js';
+import { findClaudePath } from './lib/claude-path.js';
+import createDebug from 'debug';
+
+const debug = createDebug('claude:cli');
 
 interface ClaudeMessage {
   type: string;
@@ -40,22 +43,12 @@ export class ClaudeCodeExecutor implements AgentExecutor {
     const timeoutSeconds = parseInt(process.env.CLAUDE_TIMEOUT_SECONDS || '300', 10);
     this.timeoutMs = timeoutSeconds * 1000;
 
-    // Find claude executable and resolve symlink to actual script
-    const whichResult = spawnSync('which', ['claude'], { encoding: 'utf8' });
-    if (whichResult.status !== 0 || !whichResult.stdout.trim()) {
+    // Find Claude CLI path
+    const claudePath = findClaudePath();
+    if (!claudePath) {
       throw new Error('Could not find claude executable. Install it with: npm install -g @anthropic-ai/claude-code');
     }
-    const claudeSymlink = whichResult.stdout.trim();
-
-    // Resolve symlink using readlink
-    const readlinkResult = spawnSync('readlink', [claudeSymlink], { encoding: 'utf8' });
-    if (readlinkResult.status === 0 && readlinkResult.stdout.trim()) {
-      // Resolve relative path to absolute
-      this.claudePath = resolve(dirname(claudeSymlink), readlinkResult.stdout.trim());
-    } else {
-      // Not a symlink, use as is
-      this.claudePath = claudeSymlink;
-    }
+    this.claudePath = claudePath;
     console.log(`Found Claude at: ${this.claudePath}`);
   }
 
@@ -102,19 +95,26 @@ export class ClaudeCodeExecutor implements AgentExecutor {
       contextId,
       status: {
         state: TaskState.Working,
+        message: {
+          kind: Kind.Message,
+          role: Role.Agent,
+          messageId: uuidv4(),
+          parts: [{ kind: Kind.Text, text: 'Sending message to Claude Code...' }],
+          taskId,
+          contextId,
+        },
         timestamp: new Date().toISOString(),
       },
       final: false,
     });
 
+    // Execute Claude Code
     try {
       await this.executeClaudeCode(userText, contextId, taskId, eventBus);
-    } catch (error) {
-      console.error('Error executing Claude Code:', error);
+    } catch (error: any) {
+      console.error(chalk.red(`error executing Claude Code: ${error.message || error}`));
 
-      const errorText = error instanceof Error ? error.message : String(error);
-
-      // Send task failed status
+      // Publish error status
       eventBus.publish({
         kind: Kind.StatusUpdate,
         taskId,
@@ -126,12 +126,7 @@ export class ClaudeCodeExecutor implements AgentExecutor {
             kind: Kind.Message,
             role: Role.Agent,
             messageId: uuidv4(),
-            parts: [
-              {
-                kind: Kind.Text,
-                text: errorText,
-              },
-            ],
+            parts: [{ kind: Kind.Text, text: error.message || 'Unknown error' }],
             taskId,
             contextId,
           },
@@ -167,52 +162,73 @@ export class ClaudeCodeExecutor implements AgentExecutor {
 
       let accumulatedText = '';
       let newSessionId = sessionId;
-      const stdoutLines: string[] = [];
+      let buffer = '';
 
-      // Capture stdout
+      // Process stdout as it arrives
       subprocess.stdout?.on('data', (chunk) => {
-        stdoutLines.push(chunk.toString());
-      });
+        buffer += chunk.toString();
+        const lines = buffer.split('\n');
 
-      // Wait for completion
-      const result = await subprocess;
+        // Keep last incomplete line in buffer
+        buffer = lines.pop() || '';
 
-      // Process all stdout lines
-      const allOutput = result.stdout || stdoutLines.join('');
-      const lines = allOutput.split('\n');
+        for (const line of lines) {
+          if (!line.trim()) continue;
 
-      for (const line of lines) {
-        if (!line.trim()) continue;
+          try {
+            const msg: ClaudeMessage = JSON.parse(line);
 
-        try {
-          const msg: ClaudeMessage = JSON.parse(line);
+            // Log stream chunk preview
+            const preview = line.substring(0, 70).replace(/\s+/g, ' ');
+            debug(`stream receive: ${preview}${line.length > 70 ? '...' : ''}`);
 
-          // Handle different message types
-          if (msg.type === 'user' || msg.type === 'assistant') {
-            // Extract text from content array (check both msg.content and msg.message.content)
-            const content = msg.content || msg.message?.content;
-            if (content) {
-              for (const item of content) {
-                if (item.type === 'text' && item.text) {
-                  accumulatedText += item.text;
+            // Handle different message types
+            if (msg.type === 'user' || msg.type === 'assistant') {
+              // Extract text from content array
+              const content = msg.content || msg.message?.content;
+              if (content) {
+                for (const item of content) {
+                  if (item.type === 'text' && item.text) {
+                    accumulatedText += item.text;
+
+                    // Publish intermediate update
+                    eventBus.publish({
+                      kind: Kind.StatusUpdate,
+                      taskId,
+                      contextId,
+                      status: {
+                        state: TaskState.Working,
+                        message: {
+                          kind: Kind.Message,
+                          role: Role.Agent,
+                          messageId: uuidv4(),
+                          parts: [{ kind: Kind.Text, text: accumulatedText }],
+                          taskId,
+                          contextId,
+                        },
+                        timestamp: new Date().toISOString(),
+                      },
+                      final: false,
+                    });
+                  }
+                }
+              }
+            } else if (msg.type === 'system') {
+              // Handle system messages (like session_id)
+              if (msg.subtype === 'init' && msg.session_id) {
+                newSessionId = msg.session_id;
+              } else if (msg.msg_type === 'result') {
+                // Final result message
+                if (msg.result) {
+                  accumulatedText += msg.result;
                 }
               }
             }
-          } else if (msg.type === 'system') {
-            // Handle system messages (like session_id)
-            if (msg.subtype === 'init' && msg.session_id) {
-              newSessionId = msg.session_id;
-            } else if (msg.msg_type === 'result') {
-              // Final result message
-              if (msg.result) {
-                accumulatedText += msg.result;
-              }
-            }
+          } catch (parseError) {
+            // Ignore parse errors for non-JSON lines
           }
-        } catch (parseError) {
-          // Ignore parse errors for non-JSON lines
         }
-      }
+      });
 
       // Wait for process to complete
       await subprocess;
@@ -224,23 +240,23 @@ export class ClaudeCodeExecutor implements AgentExecutor {
         this.sessions.set(contextId, newSessionId);
       }
 
-      // Send final response
+      // Send final response as a completed task
       const finalText = accumulatedText || 'No response from Claude Code';
       // Crop to single line (replace newlines with space, limit to 80 chars)
       const oneLine = finalText.replace(/\s+/g, ' ').trim();
       const responsePreview = oneLine.substring(0, 80);
       console.log(`    ← Response: "${responsePreview}${oneLine.length > 80 ? '...' : ''}"`);
 
-      eventBus.publish({
+      const responseMessage = {
         kind: Kind.Message,
         role: Role.Agent,
         messageId: uuidv4(),
         parts: [{ kind: Kind.Text, text: finalText }],
         taskId,
         contextId,
-      });
+      };
 
-      // Send task completed status
+      // Send completed status with message embedded and final flag
       eventBus.publish({
         kind: Kind.StatusUpdate,
         taskId,
@@ -248,6 +264,7 @@ export class ClaudeCodeExecutor implements AgentExecutor {
         status: {
           state: TaskState.Completed,
           timestamp: new Date().toISOString(),
+          message: responseMessage,
         },
         final: true,
       });

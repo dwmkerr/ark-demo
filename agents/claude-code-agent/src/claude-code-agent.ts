@@ -15,7 +15,7 @@ const agentCard: AgentCard = {
   version: pkg.version,
   protocolVersion: '1.0',
   capabilities: {
-    streaming: false,
+    streaming: true,
     pushNotifications: false,
     stateTransitionHistory: true,
   },

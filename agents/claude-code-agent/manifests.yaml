@@ -67,4 +67,5 @@ spec:
       serviceRef:
         name: claude-agent
         port: http
+  timeout: "10m"  # Extended timeout for long operations like cloning repos
   description: "Claude Code AI assistant for software engineering tasks"
