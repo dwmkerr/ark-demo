@@ -1,0 +1,170 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: cleanup-pr-review
+  annotations:
+    workflows.argoproj.io/title: "Cleanup PR Review Comments"
+    workflows.argoproj.io/description: |
+      Deletes AI review comments (with <!-- ark-pr-review --> marker) from PRs.
+
+      Requires a GitHub token with write access to the repository.
+spec:
+  entrypoint: main
+  serviceAccountName: argo-workflow
+
+  arguments:
+    parameters:
+    - name: github-repo
+      value: "mckinsey/agents-at-scale-ark"
+      description: "GitHub repository in org/repo format"
+
+    - name: pr-ids
+      value: ""
+      description: "Comma-separated PR IDs to clean (e.g., 234,56,2). If empty, cleans all open PRs."
+
+    - name: gh-token
+      value: ""
+      description: "GitHub token for API access. Required."
+
+  templates:
+  - name: main
+    dag:
+      tasks:
+      - name: validate
+        template: validate
+
+      - name: list-prs
+        template: list-prs
+        depends: "validate"
+
+      - name: cleanup-prs
+        template: cleanup-pr
+        depends: "list-prs"
+        arguments:
+          parameters:
+          - name: pr-id
+            value: "{{item}}"
+        withParam: "{{tasks.list-prs.outputs.parameters.result}}"
+
+      - name: summarize
+        template: summarize
+        depends: "cleanup-prs.Succeeded || cleanup-prs.Failed"
+        arguments:
+          parameters:
+          - name: pr-count
+            value: "{{tasks.list-prs.outputs.parameters.count}}"
+
+  - name: validate
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Validate required parameters"
+    script:
+      image: alpine:latest
+      command: [sh]
+      source: |
+        set -e
+
+        gh_token="{{workflow.parameters.gh-token}}"
+        if [ -z "${gh_token}" ]; then
+          echo "Error: gh-token is required for cleanup" >&2
+          exit 1
+        fi
+
+        echo "Parameters validated"
+
+  - name: list-prs
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "List PRs to clean up"
+    script:
+      image: badouralix/curl-jq:latest
+      command: [sh]
+      env:
+      - name: GH_TOKEN
+        value: "{{workflow.parameters.gh-token}}"
+      source: |
+        set -e -o pipefail
+
+        pr_ids="{{workflow.parameters.pr-ids}}"
+
+        if [ -n "$pr_ids" ]; then
+          # Use explicitly provided PR IDs.
+          echo "$pr_ids" | tr ',' '\n' | jq -R . | jq -s 'map(tonumber)' > /tmp/pr-list.json
+        else
+          # Get all open PRs.
+          curl -sS \
+            -H "Authorization: token ${GH_TOKEN}" \
+            "https://api.github.com/repos/{{workflow.parameters.github-repo}}/pulls?state=open&per_page=100" \
+            | jq '[.[].number]' > /tmp/pr-list.json
+        fi
+
+        # Count PRs.
+        jq 'length' /tmp/pr-list.json > /tmp/pr-count.txt
+
+        echo "Found $(cat /tmp/pr-count.txt) PRs to check"
+        cat /tmp/pr-list.json
+    outputs:
+      parameters:
+      - name: result
+        valueFrom:
+          path: /tmp/pr-list.json
+      - name: count
+        valueFrom:
+          path: /tmp/pr-count.txt
+
+  - name: cleanup-pr
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Delete AI review comments from a PR"
+    inputs:
+      parameters:
+      - name: pr-id
+    script:
+      image: badouralix/curl-jq:latest
+      command: [sh]
+      env:
+      - name: GH_TOKEN
+        value: "{{workflow.parameters.gh-token}}"
+      source: |
+        set -e -o pipefail
+
+        pr_id="{{inputs.parameters.pr-id}}"
+        repo="{{workflow.parameters.github-repo}}"
+        marker="<!-- ark-pr-review -->"
+
+        echo "Checking PR #${pr_id} for AI review comments..."
+
+        # Find comments with marker.
+        comment_ids=$(curl -sS \
+          -H "Authorization: token ${GH_TOKEN}" \
+          "https://api.github.com/repos/${repo}/issues/${pr_id}/comments" \
+          | jq -r ".[] | select(.body | contains(\"${marker}\")) | .id")
+
+        if [ -z "${comment_ids}" ]; then
+          echo "No AI review comments found on PR #${pr_id}"
+          exit 0
+        fi
+
+        # Delete each comment.
+        for comment_id in ${comment_ids}; do
+          echo "Deleting comment ${comment_id}..."
+          curl -sS -X DELETE \
+            -H "Authorization: token ${GH_TOKEN}" \
+            "https://api.github.com/repos/${repo}/issues/comments/${comment_id}"
+        done
+
+        echo "Cleaned up PR #${pr_id}"
+
+  - name: summarize
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Summarize cleanup results"
+    inputs:
+      parameters:
+      - name: pr-count
+    script:
+      image: alpine:latest
+      command: [sh]
+      source: |
+        echo "Cleanup complete"
+        echo "Checked {{inputs.parameters.pr-count}} PRs for AI review comments"

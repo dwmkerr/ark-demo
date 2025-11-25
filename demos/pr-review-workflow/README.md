@@ -4,6 +4,8 @@ This workflow orchestrates the pull-request review process against an open sourc
 
 This demonstrates a combination of agentic and procedural/deterministic operations, along the way highlighting a number of [Ark](https://github.com/mckinsey/agents-at-scale/ark) and Argo capabilities, such as: validation of configuration, risk-management for credentials, running workflow steps in isolated and customised containers, human-in-the-loop approval, recording of actions for audit/forensics, procedural/deterministic operations, fan-out of work across multiple parallel steps, agentic operations, agentic attribution or 'breadcrumbs', session management and telemetry across complex processes and more.
 
+![Screenshot: Workflow Summary](./images/workflow-summary.png)
+
 <!-- vim-markdown-toc GFM -->
 
 - [Overview](#overview)
@@ -38,17 +40,11 @@ An agent is used to review each pull request, against a configurable and version
 
 **Optional Commentary on Pull Requests, with Attribution**
 
-In this optional step, the review of the pull request is published, along with labels and tags that attribute the work to the specific agent, as 'breadcrumbs' for later review.
-
-TODO: in this step, if the github token was provided and option to comment on the pull request was chosen, we should now add the pull request review as a comment. Note that we must:
-
-- 1. make sure that it is clear that this commentary has been added via the Pull Request Review agent. The details should be in a collapsible 'details' block. We must label the pull request review comment with something that shows it has been done by an ai agent, this might be by trying to add a label 'ai-review:complete' or something. if there is an existing review comment it should instead be updated.
+In this optional step, the review of the pull request is added as  comment.
 
 **Final Summarisation and Report with optional Cleanup**
 
-A final summarisation of all steps is made, with a final report saved to long-term storage.
-TODO: Show summary with `ark query output` or `ark dashboard`
-5. Clean up?
+A final summarisation of all steps is made, with a final report saved to long-term storage. A table is shown with a link to each pull request and the review comment.
 
 ## Installation
 
@@ -154,6 +150,10 @@ By clicking on any node in the workflow and checking "Summary > Logs" the output
 Any artifact can be selected to view the file contents:
 
 ![Output Screenshot: Artifacts](./images/outputs-artifacts.png)
+
+If the option to add a comment to the pull request was set, the pull request will be updated:
+
+![Output Screenshot: Pull Request Comment](./images/outputs-review-comment.png)
 
 If a telemetry provider has been configured, all queries, tool calls, HTTP calls, token usage etc can be analysed. In the screenshot below Langfuse has been configured as a telemetry provider (see the [Agents at Scale Marketplace](https://github.com/mckinsey/agents-at-scale-marketplace) for instructions on how to do setup Langfuse, Phoenix, etc):
 
