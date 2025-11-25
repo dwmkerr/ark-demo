@@ -14,6 +14,7 @@ This demo kit includes Models, Agents, Agents-as-Tools (sometimes called "Sub-ag
     - [Tools](#tools)
     - [MCP Servers](#mcp-servers)
 - [Interactive Notebooks](#interactive-notebooks)
+- [Demos](#demos)
 
 <!-- vim-markdown-toc -->
 
@@ -140,3 +141,9 @@ pip install jupyterlab
 |---------|-------------|
 | `python -m jupyterlab notebooks/ark-openai-apis-basic.ipynb` | Simple non-interactive demo showing basic ARK OpenAI API usage |
 | `python -m jupyterlab notebooks/ark-openai-apis.ipynb` | Interactive interface with widgets for target selection and streaming modes |
+
+## Demos
+
+| Demo | Description |
+|------|-------------|
+| [PR Review Workflow](./demos/pr-review-workflow/README.md) | Argo workflow that reviews GitHub PRs using agents, with optional PR commenting and HTML summary reports |
