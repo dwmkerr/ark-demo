@@ -7,6 +7,4 @@ build
 .devspace
 .env
 .env.local
-README.md
 Makefile
-*.md
