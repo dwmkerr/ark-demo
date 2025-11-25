@@ -1,130 +1,176 @@
 # pr-review-workflow
 
-This workflow reviews all requests in a GitHub repository.
+This workflow orchestrates the pull-request review process against an open source repository.
+
+This demonstrates a combination of agentic and procedural/deterministic operations, along the way highlighting a number of [Ark](https://github.com/mckinsey/agents-at-scale/ark) and Argo capabilities, such as: validation of configuration, risk-management for credentials, running workflow steps in isolated and customised containers, human-in-the-loop approval, recording of actions for audit/forensics, procedural/deterministic operations, fan-out of work across multiple parallel steps, agentic operations, agentic attribution or 'breadcrumbs', session management and telemetry across complex processes and more.
+
+![Screenshot: Workflow Summary](./images/workflow-summary.png)
+
+<!-- vim-markdown-toc GFM -->
+
+- [Overview](#overview)
+- [Installation](#installation)
+- [Running the Workflow](#running-the-workflow)
+- [Inspecting Outputs, Artifacts and Telemetry](#inspecting-outputs-artifacts-and-telemetry)
+- [Cleanup](#cleanup)
+
+<!-- vim-markdown-toc -->
+
+## Overview
+
+The workflow performs the following actions:
+
+**Preparation and Validation of Configuration**
+
+The first step validates that the required resources and capabilities are installed, such as agents, models and MCP servers. It also ensures that the configuration parameters passed to the workflow are valid.
+
+**Approval**
+
+The second requests approval, after summarising the potential impact or risk of the workflow. This includes assessing provided credentials to determine whether permissions are overly permissive or risky.
+
+A summary of the approval is written if/when approval completes. The approval can be skipped with via configuration parameters - this is not recommended but can be used to make it easier to demo or test the process.
+
+**Listing open Pull Requests in a Repository**
+
+This operation is deterministic, rather than agentic, highlighting when simple procedural operations should be performed over agentic operations. Least-privilege and scalable approaches are used.
+
+**Agentic Review of Pull Requests against Configurable Standards**
+
+An agent is used to review each pull request, against a configurable and version controlled set of standards, via MCP. TODO note that model could be configured based on complexity/scope.
+
+**Optional Commentary on Pull Requests, with Attribution**
+
+In this optional step, the review of the pull request is added as  comment.
+
+**Final Summarisation and Report with optional Cleanup**
+
+A final summarisation of all steps is made, with a final report saved to long-term storage. A table is shown with a link to each pull request and the review comment.
 
 ## Installation
 
+First, ensure that [Ark](http://github.com/mckinsey/agents-at-scale-ark) is installed. Run the commands below, or follow the [Ark Quickstart Guide](https://mckinsey.github.io/agents-at-scale-ark/quickstart/):
+
 ```bash
-# Ensure Argo / Ark Workflows is installed.
-pushd ~/repos/github/McK-Internal/agents-at-scale-marketplace/ark-workflows
-devspace deploy
-popd
+# Install the Ark CLI (Node.JS and NPM required).
+npm install -g @agents-at-scale/ark
 
-# Create a PVC to use as a shared workspace.
-kubectl apply -f ./workspace-pvc.yaml
+# Install Ark. Wait for up to 5m for ark to be ready.
+ark install
+ark status --wait-for-ready=5m
 
-# Install the shell MCP server with workspace PVC mounted.
-helm install shell-mcp oci://ghcr.io/dwmkerr/charts/shell-mcp \
-  --set volumes[0].name=workspace \
-  --set volumes[0].persistentVolumeClaim.claimName=github-mcp-workspace \
-  --set volumeMounts[0].name=workspace \
-  --set volumeMounts[0].mountPath=/workspace
-
-# Install the GitHub MCP server.
-helm install github-mcp oci://ghcr.io/dwmkerr/charts/github-mcp \
-  --set github.token="$GITHUB_TOKEN"
-
-# Create the PR review agent with all GitHub and shell tools
-kubectl apply -f ./pr-review-agent.yaml
-
-# Create the workflow template.
-kubectl apply -f ./pr-review-workflow.yaml
-
-# To run the workflow, option 1 is to use the argo cli:
-argo submit --from workflowtemplate/pr-review-workflow \
-    -p github-org=mckinsey \
-    -p github-repo=agents-at-scale-ark \
-    --watch
-
-# Option 2 is to use the UI. If you are using `devspace dev` for
-# `ark-workflows` this port is automatically forwarded.
-kubectl port-forward 2746:2746 &
-open http://localhost:2746
+# Use the dashboard to configure a default model (or check the docs).
+ark dashboard
 ```
 
-## Artifact Storage
+You must have a default model configured, run `ark dashboard` and follow the instructions, or check [the docs](https://mckinsey.github.io/agents-at-scale-ark/quickstart/).
 
-Argo can store artifacts to any S3 backend. To enable [Minio as an Artifact Repository](https://argo-workflows.readthedocs.io/en/latest/configure-artifact-repository/#configuring-minio):
+Now install [Argo Workflows for Ark](https://mckinsey.github.io/agents-at-scale-ark/developer-guide/workflows/argo-workflows), along with [Minio as an Artifact Repository](https://argo-workflows.readthedocs.io/en/latest/configure-artifact-repository/#configuring-minio) for artifact storage. Note that at a later date Argo will be optionally installed as part of the main Ark installation and this step will not be required:
 
 ```bash
-# Install the minio operator.
-helm repo add minio https://charts.min.io/ # official minio Helm charts
-helm repo update
+# First install Minio, which will be used for file storage.
+helm upgrade minio-operator operator \
+  --install \
+  --repo https://operator.min.io \
+  --namespace minio-operator \
+  --create-namespace \
+  --version 7.1.1
 
-# Install the minio tenant.
-helm upgrade --install minio-tenant minio-operator/tenant
+# Now install Argo workflows, with minio enabled.
+helm upgrade argo-workflows \
+  oci://ghcr.io/mckinsey/agents-at-scale-ark/charts/argo-workflows \
+  --install \
+  --set minio.enabled=true
 
-# Get the username / password. Defaults to:
+# These services can take a while to install, check the status with:
+kubectl get tenant                                           # will show 'green'
+kubectl get pods -n minio-operator                           # will show 'ready'
+kubectl get pods -l app.kubernetes.io/part-of=argo-workflows # will show 'ready'
+```
+
+You can now check the Argo Workflows dashboard as well as the Minio dashboard:
+
+```bash
+# Show the Argo Workflows dashboard:
+kubectl port-forward svc/argo-workflows-server 2746:2746
+# http://localhost:2746
+
+# Show the minio dashboard:
+kubectl port-forward svc/myminio-console 9443:9443
+# https://localhost:9443
 # Username: minio
 # Password: minio123
-username="$(kubectl get secret myminio-env-configuration \
-    -o jsonpath='{.data.config\.env}' | base64 -d |\
-    grep MINIO_ROOT_USER | cut -d'"' -f2)"
-password="$(kubectl get secret myminio-env-configuration \
-    -o jsonpath='{.data.config\.env}' | base64 -d |\
-    grep MINIO_ROOT_PASSWORD | cut -d'"' -f2)"
-echo "Minio root user:"
-echo "  username: ${username}"
-echo "  password: ${password}"
-
-# Open the console. Use the username/password.
-kubectl port-forward svc/myminio-console 9443:9443
-# or:
-# minikube service --url myminio-console
-
-# Install the minio cli.
-brew install minio-mc
-
-# Port forward the minio service port.
-kubectl port-forward svc/myminio-hl 9000
-
-# Set the mc client to our minio tenant.
-mc alias set myminio https://localhost:9000 "${username}" "${password}" --insecure
-
-# Create a bucket for the pr-review-workflow.
-mc mb myminio/pr-review-workflow --insecure
-
-# Create a secret for argo to access minio.
-kubectl create secret generic minio-credentials \
-    --from-literal=accessKey="${username}" \
-    --from-literal=secretKey="${password}"
-
-# We're going to configure argo to point to minio. This requires the namespace
-# qualified service name. This little snippet is janky - we're grabbing the kube
-# context namespace (as all the other commands in this script don't use '-n' we
-# are essentially doing everything in the current context namespace).
-# Get that namespace - we need it for the service URL used in the S3 config
-# below.
-namespace="$(kubectl config view --minify -o jsonpath='{.contexts[0].context.namespace}')"
-namespace="${namespace:-default}"
-
-# Create artifact repository configmap for argo workflows.
-# This configures Argo to store workflow artifacts in MinIO.
-cat <<EOF | kubectl apply -f -
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: artifact-repositories
-  annotations:
-    workflows.argoproj.io/default-artifact-repository: default-artifact-repository
-data:
-  default-artifact-repository: |
-    s3:
-      bucket: pr-review-workflow
-      endpoint: minio.${namespace}.svc.cluster.local:443
-      # MinIO uses TLS, so we set insecure: false and provide the CA certificate.
-      # The CA certificate comes from the myminio-tls secret created by the MinIO operator.
-      # Use full DNS name (minio.default.svc.cluster.local) to match the certificate.
-      insecure: false
-      caSecret:
-        name: myminio-tls
-        key: public.crt
-      # Credentials to minio's S3 backend.
-      accessKeySecret:
-        name: minio-credentials
-        key: accessKey
-      secretKeySecret:
-        name: minio-credentials
-        key: secretKey
-EOF
 ```
+
+Optionally install a telemetry service such as [Langfuse](https://mckinsey.github.io/agents-at-scale-marketplace/services/langfuse/) or [Phoenix](https://mckinsey.github.io/agents-at-scale-marketplace/services/phoenix/). As an example for Langfuse:
+
+```bash
+# Install langfuse, wait for it to be ready (this can take 5-10 mins), then open
+# the dashboard.
+ark install marketplace/services/langfuse
+kubectl wait --for=condition=Available -n telemetry deployment/langfuse-web
+kubectl port-forward -n telemetry services/langfuse-web 3000:3000
+# https://localhost:3000
+# Username: password123
+```
+
+Install the Pull Request Review workflow, as well as the GitHub MCP server which it depends upon:
+
+```bash
+# Install the GitHub MCP server with your GitHub token.
+helm upgrade --install github-mcp oci://ghcr.io/dwmkerr/charts/github-mcp \
+  --set github.token=${GITHUB_TOKEN}
+
+# Install the Pull Request Review workflow.
+kubectl apply -f https://raw.githubusercontent.com/dwmkerr/ark-demo/refs/heads/main/demos/pr-review-workflow/pr-review-workflow.yaml
+```
+
+## Running the Workflow
+
+Open the Argo Dashboard (http://localhost:2746) and submit the workflow, watch the status and click on the 'Approval' step and then approve/reject as needed. The workflow will run and all open pull requests will be reviewed:
+
+![Workflow Screenshot](./images/workflow-screenshot.png)
+
+The workflow can also be run using the `argo` CLI:
+
+```bash
+argo submit --from workflowtemplate/pr-review-workflow \
+    -p github-repo=mckinsey/agents-at-scale-ark \
+    --watch
+# When needed, run 'argo resume <workflow_name>'
+```
+
+![Argo CLI Workflow Screenshot](./images/argo-cli-workflow-screenshot.png)
+
+## Inspecting Outputs, Artifacts and Telemetry
+
+By clicking on any node in the workflow and checking "Summary > Logs" the output of each step can be seen:
+
+![Output Screenshot: Logs](./images/outputs-logs.png)
+
+Any artifact can be selected to view the file contents:
+
+![Output Screenshot: Artifacts](./images/outputs-artifacts.png)
+
+If the option to add a comment to the pull request was set, the pull request will be updated:
+
+![Output Screenshot: Pull Request Comment](./images/outputs-review-comment.png)
+
+If a telemetry provider has been configured, all queries, tool calls, HTTP calls, token usage etc can be analysed. In the screenshot below Langfuse has been configured as a telemetry provider (see the [Agents at Scale Marketplace](https://github.com/mckinsey/agents-at-scale-marketplace) for instructions on how to do setup Langfuse, Phoenix, etc):
+
+![Output Screenshot: Telemetry](./images/outputs-telemetry.png)
+
+![Output Screenshot: Telemetry Sessions](./images/outputs-telemetry-sessions.png)
+
+Of course, all queries and agents and associated Ark resources can also be accessed via the Ark dashboard:
+
+![Output Screenshot: Ark Dashboard Queries](./images/outputs-ark-dashboard-queries.png)
+
+Finally, if an artifact storage provider has been configured, then artifacts will be available to view in their backend. In this example, Minio has been used as a storage backend and the workflow artifacts are shown:
+
+![Output Screenshot: S3 Storage](./images/outputs-s3.png)
+
+Any S3 API compatible storage backend can be used.
+
+## Cleanup
+
+The [`cleanup-pr-review`](./cleanup-pr-review.yaml) workflow can be used to clean up comments generated by the PR review process.
