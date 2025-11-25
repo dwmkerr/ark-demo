@@ -1,21 +1,16 @@
 # pr-review-workflow
 
-This workflow demonstrates the orchestration of a pull-request review process against configurable guidelines for a GitHub process.
+This workflow orchestrates the pull-request review process against an open source repository.
 
 This demonstrates a combination of agentic and procedural/deterministic operations, along the way highlighting a number of [Ark](https://github.com/mckinsey/agents-at-scale/ark) and Argo capabilities, such as: validation of configuration, risk-management for credentials, running workflow steps in isolated and customised containers, human-in-the-loop approval, recording of actions for audit/forensics, procedural/deterministic operations, fan-out of work across multiple parallel steps, agentic operations, agentic attribution or 'breadcrumbs', session management and telemetry across complex processes and more.
 
-Along this way, a number of [good practices and risk management considerations](TODO) are highlighted, and described in more detail in this write-up. [Minio](https://www.min.io/)[^1]TODO is used for file-storage - for enterprise environments this can be switched to Amazon S3, Google Cloud Storage, etc.
-
 <!-- vim-markdown-toc GFM -->
 
-    - [Overview](#overview)
-    - [Installation](#installation)
-    - [Running the Workflow](#running-the-workflow)
-    - [Inspecting Output, Reports and Artifacts](#inspecting-output-reports-and-artifacts)
-    - [Final Thoughts](#final-thoughts)
-    - [Viewing Telemetry Data](#viewing-telemetry-data)
-    - [TODO](#todo)
-- [Troubleshooting](#troubleshooting)
+- [Overview](#overview)
+- [Installation](#installation)
+- [Running the Workflow](#running-the-workflow)
+- [Inspecting Outputs, Artifacts and Telemetry](#inspecting-outputs-artifacts-and-telemetry)
+- [Final Thoughts](#final-thoughts)
 
 <!-- vim-markdown-toc -->
 
@@ -40,15 +35,14 @@ This operation is deterministic, rather than agentic, highlighting when simple p
 **Agentic Review of Pull Requests against Configurable Standards**
 
 An agent is used to review each pull request, against a configurable and version controlled set of standards, via MCP. TODO note that model could be configured based on complexity/scope.
-4. Labels for attribution
-3. Structured output? TODO avoid magic strings
 
 **Optional Commentary on Pull Requests, with Attribution**
 
 In this optional step, the review of the pull request is published, along with labels and tags that attribute the work to the specific agent, as 'breadcrumbs' for later review.
-4. Partial tool calls?
-4. MCP 'currying'
-4. Optionally comment on each PR - but update/replace comment if already commented
+
+TODO: in this step, if the github token was provided and option to comment on the pull request was chosen, we should now add the pull request review as a comment. Note that we must:
+
+- 1. make sure that it is clear that this commentary has been added via the Pull Request Review agent. The details should be in a collapsible 'details' block. We must label the pull request review comment with something that shows it has been done by an ai agent, this might be by trying to add a label 'ai-review:complete' or something. if there is an existing review comment it should instead be updated.
 
 **Final Summarisation and Report with optional Cleanup**
 
@@ -136,67 +130,47 @@ kubectl apply -f https://raw.githubusercontent.com/dwmkerr/ark-demo/refs/heads/m
 
 ## Running the Workflow
 
-TODO
-TODO show services in ark
+Open the Argo Dashboard (http://localhost:2746) and submit the workflow, watch the status and click on the 'Approval' step and then approve/reject as needed. The workflow will run and all open pull requests will be reviewed:
+
+![Workflow Screenshot](./images/workflow-screenshot.png)
+
+The workflow can also be run using the `argo` CLI:
 
 ```bash
-# To run the workflow, option 1 is to use the argo cli:
 argo submit --from workflowtemplate/pr-review-workflow \
-    -p github-org=mckinsey \
-    -p github-repo=agents-at-scale-ark \
+    -p github-repo=mckinsey/agents-at-scale-ark \
     --watch
-
-# Option 2 is to use the UI. If you are using `devspace dev` for
-# `ark-workflows` this port is automatically forwarded.
-kubectl port-forward 2746:2746 &
-open http://localhost:2746
+# When needed, run 'argo resume <workflow_name>'
 ```
 
-## Inspecting Output, Reports and Artifacts
+![Argo CLI Workflow Screenshot](./images/argo-cli-workflow-screenshot.png)
+
+## Inspecting Outputs, Artifacts and Telemetry
+
+By clicking on any node in the workflow and checking "Summary > Logs" the output of each step can be seen:
+
+![Output Screenshot: Logs](./images/outputs-logs.png)
+
+Any artifact can be selected to view the file contents:
+
+![Output Screenshot: Artifacts](./images/outputs-artifacts.png)
+
+If a telemetry provider has been configured, all queries, tool calls, HTTP calls, token usage etc can be analysed. In the screenshot below Langfuse has been configured as a telemetry provider (see the [Agents at Scale Marketplace](https://github.com/mckinsey/agents-at-scale-marketplace) for instructions on how to do setup Langfuse, Phoenix, etc):
+
+![Output Screenshot: Telemetry](./images/outputs-telemetry.png)
+
+![Output Screenshot: Telemetry Sessions](./images/outputs-telemetry-sessions.png)
+
+Of course, all queries and agents and associated Ark resources can also be accessed via the Ark dashboard:
+
+![Output Screenshot: Ark Dashboard Queries](./images/outputs-ark-dashboard-queries.png)
+
+Finally, if an artifact storage provider has been configured, then artifacts will be available to view in their backend. In this example, Minio has been used as a storage backend and the workflow artifacts are shown:
+
+![Output Screenshot: S3 Storage](./images/outputs-s3.png)
+
+Any S3 API compatible storage backend can be used.
 
 ## Final Thoughts
 
 TODO note claude upcoming
-
-## Viewing Telemetry Data
-
-
-TODO S3 CLI
-
-```
-# Create a secret for argo to access minio.
-kubectl create secret generic minio-credentials \
-    --from-literal=accessKey="${username}" \
-    --from-literal=secretKey="${password}"
-
-# We're going to configure argo to point to minio. This requires the namespace
-# qualified service name. This little snippet is janky - we're grabbing the kube
-# context namespace (as all the other commands in this script don't use '-n' we
-# are essentially doing everything in the current context namespace).
-# Get that namespace - we need it for the service URL used in the S3 config
-# below.
-namespace="$(kubectl config view --minify -o jsonpath='{.contexts[0].context.namespace}')"
-namespace="${namespace:-default}"
-```
-
-## TODO
-TODO Dashboard
-any way to pull out scripts? configmap?
-TODO session id
-TODO eliminate 
-
-**Bugs/Must-Fix**
-
-- [ ] Argo/Minio bug - artifact repository not automatically configured https://github.com/mckinsey/agents-at-scale-ark/pull/482
-- [ ] Services via ark cli
-- [ ] langfuse not restarting
-
-**Nice-to-have**
-
-- [ ] Show Langfuse/Phoenix output: https://github.com/mckinsey/agents-at-scale-marketplace/pull/64
-- [ ] Show `ark install marketplace/` commands in docs https://github.com/mckinsey/agents-at-scale-marketplace/issues/63
-- [ ] Allow 'retries' or similar for queries (e.g. to handle rate-limit errors).
-
-# Troubleshooting
-
-- TODO: github token, check the GH mcp server logs / conditions
