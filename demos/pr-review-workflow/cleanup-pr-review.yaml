@@ -12,6 +12,16 @@ spec:
   entrypoint: main
   serviceAccountName: argo-workflow
 
+  volumeClaimTemplates:
+  - metadata:
+      name: workspace
+    spec:
+      accessModes: [ "ReadWriteMany" ]
+      resources:
+        requests:
+          storage: 1Gi
+      storageClassName: standard
+
   arguments:
     parameters:
     - name: github-repo
@@ -125,12 +135,19 @@ spec:
       env:
       - name: GH_TOKEN
         value: "{{workflow.parameters.gh-token}}"
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
       source: |
         set -e -o pipefail
 
         pr_id="{{inputs.parameters.pr-id}}"
         repo="{{workflow.parameters.github-repo}}"
+        workflow_id="{{workflow.name}}"
         marker="<!-- ark-pr-review -->"
+        result_file="/workspace/${workflow_id}/${pr_id}.txt"
+
+        mkdir -p "/workspace/${workflow_id}"
 
         echo "Checking PR #${pr_id} for AI review comments..."
 
@@ -141,19 +158,23 @@ spec:
           | jq -r ".[] | select(.body | contains(\"${marker}\")) | .id")
 
         if [ -z "${comment_ids}" ]; then
+          echo "0" > "${result_file}"
           echo "No AI review comments found on PR #${pr_id}"
           exit 0
         fi
 
-        # Delete each comment.
+        # Delete each comment and count.
+        count=0
         for comment_id in ${comment_ids}; do
           echo "Deleting comment ${comment_id}..."
           curl -sS -X DELETE \
             -H "Authorization: token ${GH_TOKEN}" \
             "https://api.github.com/repos/${repo}/issues/comments/${comment_id}"
+          count=$((count + 1))
         done
 
-        echo "Cleaned up PR #${pr_id}"
+        echo "${count}" > "${result_file}"
+        echo "Deleted ${count} comments from PR #${pr_id}"
 
   - name: summarize
     metadata:
@@ -165,6 +186,44 @@ spec:
     script:
       image: alpine:latest
       command: [sh]
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
       source: |
-        echo "Cleanup complete"
-        echo "Checked {{inputs.parameters.pr-count}} PRs for AI review comments"
+        set -e
+
+        workflow_id="{{workflow.name}}"
+        repo="{{workflow.parameters.github-repo}}"
+        workspace_path="/workspace/${workflow_id}"
+        summary_html="/tmp/summary.html"
+
+        {
+          echo "<h1>Cleanup Summary</h1>"
+          echo "<p>Workflow: ${workflow_id}<br>"
+          echo "Repository: <a href=\"https://github.com/${repo}\">${repo}</a></p>"
+          echo "<table border=\"1\" cellpadding=\"8\" cellspacing=\"0\">"
+          echo "<tr><th>PR</th><th>Comments Deleted</th></tr>"
+        } > "${summary_html}"
+
+        total=0
+        for result_file in "${workspace_path}"/*.txt; do
+          [ -f "${result_file}" ] || continue
+          pr_id=$(basename "${result_file}" .txt)
+          count=$(cat "${result_file}")
+          total=$((total + count))
+          pr_url="https://github.com/${repo}/pull/${pr_id}"
+          echo "<tr><td><a href=\"${pr_url}\">PR #${pr_id}</a></td><td>${count}</td></tr>" >> "${summary_html}"
+        done
+
+        {
+          echo "</table>"
+          echo "<p><strong>Total comments deleted: ${total}</strong></p>"
+        } >> "${summary_html}"
+
+        cat "${summary_html}"
+    outputs:
+      artifacts:
+      - name: summary
+        path: /tmp/summary.html
+        archive:
+          none: {}
