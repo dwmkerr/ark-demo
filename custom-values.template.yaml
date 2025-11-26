@@ -70,6 +70,14 @@ mcpServers:
   aiDeveloperGuide:
     enabled: true
 
+  # AWS Knowledge MCP server
+  awsKnowledge:
+    enabled: true
+
+  # Microsoft Learn MCP server
+  microsoftLearn:
+    enabled: true
+
 # Subchart configuration
 ai-developer-guide-mcp:
   mcpServer:
