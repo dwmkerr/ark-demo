@@ -4,7 +4,7 @@ kind: MCPServer
 metadata:
   name: microsoft-learn
   annotations:
-    ark.mckinsey.com/dashboard-icon: "/icons/microsoft.png"
+    ark.mckinsey.com/dashboard-icon: "/icons/azure.png"
 spec:
   address:
     value: "https://learn.microsoft.com/api/mcp"
