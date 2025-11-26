@@ -1,0 +1,14 @@
+{{- if and .Values.mcpServers .Values.mcpServers.awsKnowledge .Values.mcpServers.awsKnowledge.enabled }}
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: MCPServer
+metadata:
+  name: aws-knowledge
+  annotations:
+    ark.mckinsey.com/dashboard-icon: "/icons/aws.png"
+spec:
+  address:
+    value: "https://knowledge-mcp.global.api.aws"
+  timeout: "30s"
+  transport: http
+  description: "AWS Knowledge MCP server"
+{{- end }}

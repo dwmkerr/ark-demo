@@ -1,0 +1,14 @@
+{{- if and .Values.mcpServers .Values.mcpServers.microsoftLearn .Values.mcpServers.microsoftLearn.enabled }}
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: MCPServer
+metadata:
+  name: microsoft-learn
+  annotations:
+    ark.mckinsey.com/dashboard-icon: "/icons/azure.png"
+spec:
+  address:
+    value: "https://learn.microsoft.com/api/mcp"
+  timeout: "30s"
+  transport: http
+  description: "Microsoft Learn MCP server"
+{{- end }}

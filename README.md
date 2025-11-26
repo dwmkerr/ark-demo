@@ -128,8 +128,10 @@ MCP servers can be enabled via Helm dependencies in `custom-values.yaml`:
 | [shell-mcp](./mcp-servers/shell-mcp/README.md) | `mcpServers.shell.enabled` | `helm install shell-mcp oci://ghcr.io/dwmkerr/charts/shell-mcp` |
 | [github-mcp](./mcp-servers/github-mcp/README.md) | `mcpServers.github.enabled` | `helm install github-mcp oci://ghcr.io/dwmkerr/charts/github-mcp --set github.token="your-token"` |
 | [AI Developer Guide](https://github.com/dwmkerr/ai-developer-guide) | `mcpServers.aiDeveloperGuide.enabled` | `helm install ai-developer-guide-mcp oci://ghcr.io/dwmkerr/charts/ai-developer-guide-mcp` |
+| AWS Knowledge | `mcpServers.awsKnowledge.enabled` | Remote MCP server (no install needed) |
+| Microsoft Learn | `mcpServers.microsoftLearn.enabled` | Remote MCP server (no install needed) |
 
-Set to `true` in `custom-values.yaml` and run `make install` (dependencies update automatically).
+Set to `true` in `custom-values.yaml` and run `make install`.
 
 ## Interactive Notebooks
 
