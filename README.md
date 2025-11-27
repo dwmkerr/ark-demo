@@ -147,3 +147,4 @@ pip install jupyterlab
 | Demo | Description |
 |------|-------------|
 | [PR Review Workflow](./demos/pr-review-workflow/README.md) | Argo workflow that reviews GitHub PRs using agents, with optional PR commenting and HTML summary reports |
+| [Issue Resolution Workflow](./demos/issue-resolution-workflow/README.md) | Argo workflow that analyzes GitHub issues and suggests resolution plans using agents |

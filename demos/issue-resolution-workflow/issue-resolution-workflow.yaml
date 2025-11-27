@@ -1,0 +1,364 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: issue-resolution-workflow
+  annotations:
+    workflows.argoproj.io/title: "Issue Resolution"
+    workflows.argoproj.io/description: |
+      Reviews open issues in a GitHub repository and suggests resolution plans using an ARK agent.
+spec:
+  entrypoint: main
+  serviceAccountName: argo-workflow
+
+  volumeClaimTemplates:
+  - metadata:
+      name: workspace
+    spec:
+      accessModes: [ "ReadWriteMany" ]
+      resources:
+        requests:
+          storage: 10Gi
+      storageClassName: standard
+
+  arguments:
+    parameters:
+    - name: github-repo
+      value: "mckinsey/agents-at-scale-ark"
+      description: "GitHub repository in org/repo format"
+
+    - name: updated-since
+      value: "2000-01-01T00:00:00Z"
+      description: "Only review issues updated since this timestamp. Format: ISO8601."
+
+    - name: issue-ids
+      value: ""
+      description: "Comma-separated issue IDs to review (e.g., 234,56,2). If empty, uses all open issues matching filters."
+
+    - name: gh-token
+      value: ""
+      description: "GitHub token for API access."
+
+    - name: issue-resolution-agent
+      value: "issue-resolution-agent"
+      description: "Ark agent name for issue analysis"
+
+  templates:
+  - name: main
+    dag:
+      tasks:
+      - name: prepare-and-validate
+        template: prepare-and-validate
+
+      - name: request-approval
+        template: request-approval
+        depends: "prepare-and-validate"
+        arguments:
+          artifacts:
+          - name: workflow-plan
+            from: "{{tasks.prepare-and-validate.outputs.artifacts.workflow-plan}}"
+
+      - name: analyze-issues
+        template: analyze-issue
+        depends: "request-approval"
+        arguments:
+          parameters:
+          - name: issue-id
+            value: "{{item}}"
+        withParam: "{{tasks.prepare-and-validate.outputs.parameters.issue-ids}}"
+
+      - name: summarize
+        template: summarize
+        depends: "analyze-issues.Succeeded || analyze-issues.Failed"
+
+  - name: prepare-and-validate
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Validate prerequisites and fetch issues"
+    script:
+      image: alpine/k8s:1.28.13
+      command: [sh]
+      env:
+      - name: GH_TOKEN
+        value: "{{workflow.parameters.gh-token}}"
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
+      source: |
+        set -e -o pipefail
+        apk add --no-cache jq curl >/dev/null 2>&1
+
+        # Validate prerequisites
+        kubectl get mcpserver github
+        kubectl wait --for=condition=Ready mcpserver/github --timeout=5s
+        agent_name="{{workflow.parameters.issue-resolution-agent}}"
+        kubectl get agent "${agent_name}"
+
+        # Fetch issues
+        repo="{{workflow.parameters.github-repo}}"
+        issue_ids_param="{{workflow.parameters.issue-ids}}"
+        updated_since="{{workflow.parameters.updated-since}}"
+        workflow_id="{{workflow.name}}"
+        workspace_path="/workspace/${workflow_id}"
+        mkdir -p "${workspace_path}"
+        issues_json="${workspace_path}/issues.json"
+
+        if [ -n "$issue_ids_param" ]; then
+          echo "[]" > "${issues_json}"
+          for id in $(echo "$issue_ids_param" | tr ',' ' '); do
+            response=$(curl -sS -w "\n%{http_code}" \
+              "https://api.github.com/repos/${repo}/issues/${id}")
+            http_code=$(echo "$response" | tail -1)
+            body=$(echo "$response" | sed '$d')
+            if [ "$http_code" = "200" ]; then
+              echo "$body" | jq '{number: .number, title: .title, url: .html_url}' > /tmp/issue.json
+              jq -s '.[0] + [.[1]]' "${issues_json}" /tmp/issue.json > /tmp/merged.json
+              mv /tmp/merged.json "${issues_json}"
+            else
+              echo "Warning: Issue #${id} not found (HTTP ${http_code})" >&2
+            fi
+          done
+        else
+          curl -sS \
+            "https://api.github.com/repos/${repo}/issues?state=open&per_page=100" \
+            | jq --arg since "${updated_since}" \
+              '[.[] | select(.pull_request == null) | select(.updated_at > $since) | {number: .number, title: .title, url: .html_url}]' \
+            > "${issues_json}"
+        fi
+
+        # Generate workflow plan
+        gh_token="{{workflow.parameters.gh-token}}"
+        if [ -n "$gh_token" ]; then
+          gh_token_display="$(printf '%*s' $((${#gh_token} - 3)) '' | tr ' ' '*')${gh_token: -3}"
+        else
+          gh_token_display="not provided"
+        fi
+        issue_count=$(jq 'length' "${issues_json}")
+
+        cat > /tmp/workflow-plan.md <<EOF
+        # Issue Resolution Workflow Plan
+
+        ## Configuration
+        - **Repository:** ${repo}
+        - **Agent:** ${agent_name}
+        - **Updated Since:** ${updated_since}
+        - **GitHub Token:** ${gh_token_display}
+
+        ## Issues to Analyze (${issue_count})
+
+        | # | Title |
+        |---|-------|
+        EOF
+
+        jq -r '.[] | "| [#\(.number)](\(.url)) | \(.title) |"' "${issues_json}" >> /tmp/workflow-plan.md
+
+        cat >> /tmp/workflow-plan.md <<EOF
+
+        ## Approval Required
+
+        To approve: \`argo resume ${workflow_id}\`
+        To reject: \`argo terminate ${workflow_id}\`
+        EOF
+
+        echo "Found ${issue_count} issues to analyze"
+        cat /tmp/workflow-plan.md
+        jq '[.[].number]' "${issues_json}" > /tmp/issue-ids.json
+    outputs:
+      parameters:
+      - name: issue-ids
+        valueFrom:
+          path: /tmp/issue-ids.json
+      artifacts:
+      - name: workflow-plan
+        path: /tmp/workflow-plan.md
+        archive:
+          none: {}
+      - name: issues
+        path: /workspace/{{workflow.name}}/issues.json
+        archive:
+          none: {}
+
+  - name: request-approval
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: |
+          Review the workflow plan and issues before proceeding.
+
+          To approve: argo resume {{workflow.name}}
+          To reject: argo terminate {{workflow.name}}
+    inputs:
+      artifacts:
+      - name: workflow-plan
+    suspend: {}
+
+  - name: analyze-issue
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Analyze an issue and suggest a resolution plan"
+    inputs:
+      parameters:
+      - name: issue-id
+    script:
+      image: alpine/k8s:1.28.13
+      command: [sh]
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
+      source: |
+        set -e -o pipefail
+
+        issue_id="{{inputs.parameters.issue-id}}"
+        workflow_id="{{workflow.name}}"
+        query_name="${workflow_id}-analyze-issue-${issue_id}"
+        workspace_path="/workspace/${workflow_id}/${issue_id}"
+
+        kubectl create -f - <<EOF >&2
+        apiVersion: ark.mckinsey.com/v1alpha1
+        kind: Query
+        metadata:
+          name: ${query_name}
+          labels:
+            workflow: "{{workflow.name}}"
+          annotations:
+            ark.mckinsey.com/workflow-name: "{{workflow.name}}"
+        spec:
+          input: |
+            Analyze issue #${issue_id} in repository {{workflow.parameters.github-repo}}.
+
+            Review the issue details and provide a resolution plan in Markdown format.
+
+            Your analysis should include:
+            1. Issue summary - what is being requested or reported
+            2. Classification - bug, feature request, documentation, etc.
+            3. Suggested approach - high-level steps to resolve
+            4. Potential challenges or considerations
+            5. Estimated complexity (low/medium/high)
+
+            Note: You cannot clone the repository. Base your analysis on the issue description and any linked context.
+
+          targets:
+          - type: agent
+            name: {{workflow.parameters.issue-resolution-agent}}
+          sessionId: {{workflow.name}}
+          timeout: 10m
+          ttl: 24h
+        EOF
+
+        kubectl wait --for=condition=Completed \
+          --timeout=10m query/${query_name}
+
+        phase=$(kubectl get query "${query_name}" -o jsonpath='{.status.phase}')
+        if [ "${phase}" = "error" ]; then
+          error_msg=$(kubectl get query "${query_name}" -o jsonpath='{.status.responses[0].raw}')
+          if echo "${error_msg}" | grep -q "429\|RateLimitReached"; then
+            echo "Rate limit hit, waiting 30s and retrying..." >&2
+            sleep 30
+            kubectl get query "${query_name}" -o json | \
+              jq 'del(.status)' | \
+              kubectl replace -f -
+            kubectl wait --for=condition=Completed \
+              --timeout=10m query/${query_name}
+            phase=$(kubectl get query "${query_name}" -o jsonpath='{.status.phase}')
+          fi
+          if [ "${phase}" = "error" ]; then
+            echo "Query failed with error" >&2
+            exit 1
+          fi
+        fi
+
+        analysis_content=$(kubectl get query "${query_name}" -o jsonpath='{.status.responses[0].content}')
+        mkdir -p "${workspace_path}"
+        echo "${analysis_content}" > "${workspace_path}/analysis.md"
+        [ -f "${workspace_path}/analysis.md" ] || { echo "Failed to write analysis file" >&2; exit 1; }
+        cat "${workspace_path}/analysis.md" | tee /tmp/analysis.txt
+    outputs:
+      parameters:
+      - name: analysis
+        valueFrom:
+          path: /tmp/analysis.txt
+      artifacts:
+      - name: analysis
+        path: /tmp/analysis.txt
+        archive:
+          none: {}
+
+  - name: summarize
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Summarize all issue analyses"
+    script:
+      image: badouralix/curl-jq:latest
+      command: [sh]
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
+      source: |
+        set -e -o pipefail
+
+        workflow_id="{{workflow.name}}"
+        repo="{{workflow.parameters.github-repo}}"
+        workspace_path="/workspace/${workflow_id}"
+        issues_json="${workspace_path}/issues.json"
+        summary_html="/tmp/summary.html"
+
+        [ -d "${workspace_path}" ] || { echo "Workspace directory not found: ${workspace_path}"; exit 1; }
+
+        {
+          echo "<h1>Issue Resolution Summary</h1>"
+          echo "<p>Workflow: ${workflow_id}<br>"
+          echo "Repository: <a href=\"https://github.com/${repo}\">${repo}</a></p>"
+          echo "<h2>Analyzed Issues</h2>"
+          echo "<table border=\"1\" cellpadding=\"8\" cellspacing=\"0\">"
+          echo "<tr><th>Issue</th><th>Title</th><th>Analysis</th></tr>"
+        } > "${summary_html}"
+
+        jq -r '.[] | "\(.number)|\(.title)|\(.url)"' "${issues_json}" | while IFS='|' read -r number title url; do
+          if [ -f "${workspace_path}/${number}/analysis.md" ]; then
+            analysis_cell="Available"
+          else
+            analysis_cell="-"
+          fi
+          echo "<tr><td><a href=\"${url}\">#${number}</a></td><td>${title}</td><td>${analysis_cell}</td></tr>" >> "${summary_html}"
+        done
+
+        echo "</table>" >> "${summary_html}"
+        cat "${summary_html}"
+    outputs:
+      artifacts:
+      - name: summary
+        path: /tmp/summary.html
+        archive:
+          none: {}
+---
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: Agent
+metadata:
+  name: issue-resolution-agent
+spec:
+  modelRef:
+    name: default
+
+  prompt: |
+    You are an issue resolution assistant. You help analyze GitHub issues by:
+    1. Understanding the issue context and requirements
+    2. Classifying the type of issue (bug, feature, docs, etc.)
+    3. Suggesting a resolution approach
+
+    Provide clear, actionable plans that developers can follow.
+
+  tools:
+  - name: github-issue-read
+    type: custom
+  - name: github-get-file-contents
+    type: custom
+  - name: github-list-issues
+    type: custom
+  - name: github-search-issues
+    type: custom
+  - name: github-search-code
+    type: custom
+  - name: github-list-branches
+    type: custom
+  - name: github-list-commits
+    type: custom
+  - name: github-get-commit
+    type: custom
