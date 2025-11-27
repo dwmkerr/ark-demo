@@ -379,19 +379,26 @@ spec:
         if [ -n "${existing_comment_id}" ]; then
           # Update existing comment.
           echo "Updating existing comment ${existing_comment_id}..." >&2
-          curl -sS -X PATCH \
+          response=$(curl -sS -w "\n%{http_code}" -X PATCH \
             -H "Authorization: token ${GH_TOKEN}" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/${repo}/issues/comments/${existing_comment_id}" \
-            -d "$(jq -n --arg body "${comment_body}" '{body: $body}')"
+            -d "$(jq -n --arg body "${comment_body}" '{body: $body}')")
         else
           # Create new comment.
           echo "Creating new comment..." >&2
-          curl -sS -X POST \
+          response=$(curl -sS -w "\n%{http_code}" -X POST \
             -H "Authorization: token ${GH_TOKEN}" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/${repo}/issues/${issue_id}/comments" \
-            -d "$(jq -n --arg body "${comment_body}" '{body: $body}')"
+            -d "$(jq -n --arg body "${comment_body}" '{body: $body}')")
+        fi
+
+        http_code=$(echo "$response" | tail -1)
+        if [ "$http_code" -ge 400 ]; then
+          echo "Failed to post comment (HTTP ${http_code}):" >&2
+          echo "$response" | sed '$d' >&2
+          exit 1
         fi
 
         echo "Comment posted to issue #${issue_id}"
