@@ -20,19 +20,13 @@ This demonstrates a combination of agentic and procedural/deterministic operatio
 
 The workflow performs the following actions:
 
-**Preparation and Validation of Configuration**
+**Preparation, Validation and PR Discovery**
 
-The first step validates that the required resources and capabilities are installed, such as agents, models and MCP servers. It also ensures that the configuration parameters passed to the workflow are valid.
+The first step validates that the required resources and capabilities are installed, such as agents, models and MCP servers. It fetches the list of open pull requests and generates a workflow plan showing which PRs will be reviewed.
 
 **Approval**
 
-The second requests approval, after summarising the potential impact or risk of the workflow. This includes assessing provided credentials to determine whether permissions are overly permissive or risky.
-
-A summary of the approval is written if/when approval completes. The approval can be skipped with via configuration parameters - this is not recommended but can be used to make it easier to demo or test the process.
-
-**Listing open Pull Requests in a Repository**
-
-This operation is deterministic, rather than agentic, highlighting when simple procedural operations should be performed over agentic operations. Least-privilege and scalable approaches are used.
+The workflow pauses for approval, displaying the PRs to be reviewed. This allows operators to verify scope before proceeding.
 
 **Agentic Review of Pull Requests against Configurable Standards**
 
