@@ -1,0 +1,229 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: cleanup-issue-resolution
+  annotations:
+    workflows.argoproj.io/title: "Cleanup Issue Resolution Comments"
+    workflows.argoproj.io/description: |
+      Deletes AI analysis comments (with <!-- ark-issue-resolution --> marker) from issues.
+
+      Requires a GitHub token with write access to the repository.
+spec:
+  entrypoint: main
+  serviceAccountName: argo-workflow
+
+  volumeClaimTemplates:
+  - metadata:
+      name: workspace
+    spec:
+      accessModes: [ "ReadWriteMany" ]
+      resources:
+        requests:
+          storage: 1Gi
+      storageClassName: standard
+
+  arguments:
+    parameters:
+    - name: github-repo
+      value: "mckinsey/agents-at-scale-ark"
+      description: "GitHub repository in org/repo format"
+
+    - name: issue-ids
+      value: ""
+      description: "Comma-separated issue IDs to clean (e.g., 234,56,2). If empty, cleans all open issues."
+
+    - name: gh-token
+      value: ""
+      description: "GitHub token for API access. Required."
+
+  templates:
+  - name: main
+    dag:
+      tasks:
+      - name: validate
+        template: validate
+
+      - name: list-issues
+        template: list-issues
+        depends: "validate"
+
+      - name: cleanup-issues
+        template: cleanup-issue
+        depends: "list-issues"
+        arguments:
+          parameters:
+          - name: issue-id
+            value: "{{item}}"
+        withParam: "{{tasks.list-issues.outputs.parameters.result}}"
+
+      - name: summarize
+        template: summarize
+        depends: "cleanup-issues.Succeeded || cleanup-issues.Failed"
+        arguments:
+          parameters:
+          - name: issue-count
+            value: "{{tasks.list-issues.outputs.parameters.count}}"
+
+  - name: validate
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Validate required parameters"
+    script:
+      image: alpine:latest
+      command: [sh]
+      source: |
+        set -e
+
+        gh_token="{{workflow.parameters.gh-token}}"
+        if [ -z "${gh_token}" ]; then
+          echo "Error: gh-token is required for cleanup" >&2
+          exit 1
+        fi
+
+        echo "Parameters validated"
+
+  - name: list-issues
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "List issues to clean up"
+    script:
+      image: badouralix/curl-jq:latest
+      command: [sh]
+      env:
+      - name: GH_TOKEN
+        value: "{{workflow.parameters.gh-token}}"
+      source: |
+        set -e -o pipefail
+
+        issue_ids="{{workflow.parameters.issue-ids}}"
+
+        if [ -n "$issue_ids" ]; then
+          # Use explicitly provided issue IDs.
+          echo "$issue_ids" | tr ',' '\n' | jq -R . | jq -s 'map(tonumber)' > /tmp/issue-list.json
+        else
+          # Get all open issues (excluding PRs).
+          curl -sS \
+            -H "Authorization: token ${GH_TOKEN}" \
+            "https://api.github.com/repos/{{workflow.parameters.github-repo}}/issues?state=open&per_page=100" \
+            | jq '[.[] | select(.pull_request == null) | .number]' > /tmp/issue-list.json
+        fi
+
+        # Count issues.
+        jq 'length' /tmp/issue-list.json > /tmp/issue-count.txt
+
+        echo "Found $(cat /tmp/issue-count.txt) issues to check"
+        cat /tmp/issue-list.json
+    outputs:
+      parameters:
+      - name: result
+        valueFrom:
+          path: /tmp/issue-list.json
+      - name: count
+        valueFrom:
+          path: /tmp/issue-count.txt
+
+  - name: cleanup-issue
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Delete AI analysis comments from an issue"
+    inputs:
+      parameters:
+      - name: issue-id
+    script:
+      image: badouralix/curl-jq:latest
+      command: [sh]
+      env:
+      - name: GH_TOKEN
+        value: "{{workflow.parameters.gh-token}}"
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
+      source: |
+        set -e -o pipefail
+
+        issue_id="{{inputs.parameters.issue-id}}"
+        repo="{{workflow.parameters.github-repo}}"
+        workflow_id="{{workflow.name}}"
+        marker="<!-- ark-issue-resolution -->"
+        result_file="/workspace/${workflow_id}/${issue_id}.txt"
+
+        mkdir -p "/workspace/${workflow_id}"
+
+        echo "Checking issue #${issue_id} for AI analysis comments..."
+
+        # Find comments with marker.
+        comment_ids=$(curl -sS \
+          -H "Authorization: token ${GH_TOKEN}" \
+          "https://api.github.com/repos/${repo}/issues/${issue_id}/comments" \
+          | jq -r ".[] | select(.body | contains(\"${marker}\")) | .id")
+
+        if [ -z "${comment_ids}" ]; then
+          echo "0" > "${result_file}"
+          echo "No AI analysis comments found on issue #${issue_id}"
+          exit 0
+        fi
+
+        # Delete each comment and count.
+        count=0
+        for comment_id in ${comment_ids}; do
+          echo "Deleting comment ${comment_id}..."
+          curl -sS -X DELETE \
+            -H "Authorization: token ${GH_TOKEN}" \
+            "https://api.github.com/repos/${repo}/issues/comments/${comment_id}"
+          count=$((count + 1))
+        done
+
+        echo "${count}" > "${result_file}"
+        echo "Deleted ${count} comments from issue #${issue_id}"
+
+  - name: summarize
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Summarize cleanup results"
+    inputs:
+      parameters:
+      - name: issue-count
+    script:
+      image: alpine:latest
+      command: [sh]
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
+      source: |
+        set -e
+
+        workflow_id="{{workflow.name}}"
+        repo="{{workflow.parameters.github-repo}}"
+        workspace_path="/workspace/${workflow_id}"
+        summary_html="/tmp/summary.html"
+
+        {
+          echo "<h1>Cleanup Summary</h1>"
+          echo "<p>Workflow: ${workflow_id}<br>"
+          echo "Repository: <a href=\"https://github.com/${repo}\">${repo}</a></p>"
+          echo "<table border=\"1\" cellpadding=\"8\" cellspacing=\"0\">"
+          echo "<tr><th>Issue</th><th>Comments Deleted</th></tr>"
+        } > "${summary_html}"
+
+        total=0
+        for result_file in "${workspace_path}"/*.txt; do
+          [ -f "${result_file}" ] || continue
+          issue_id=$(basename "${result_file}" .txt)
+          count=$(cat "${result_file}")
+          total=$((total + count))
+          issue_url="https://github.com/${repo}/issues/${issue_id}"
+          echo "<tr><td><a href=\"${issue_url}\">Issue #${issue_id}</a></td><td>${count}</td></tr>" >> "${summary_html}"
+        done
+
+        {
+          echo "</table>"
+          echo "<p><strong>Total comments deleted: ${total}</strong></p>"
+        } >> "${summary_html}"
+
+        cat "${summary_html}"
+    outputs:
+      artifacts:
+      - name: summary
+        path: /tmp/summary.html
+        archive:
+          none: {}
