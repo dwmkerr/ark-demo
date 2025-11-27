@@ -232,6 +232,11 @@ spec:
     metadata:
       annotations:
         workflows.argoproj.io/description: "Review a PR using an agent"
+    retryStrategy:
+      limit: 2
+      backoff:
+        duration: "30s"
+        factor: 2
     inputs:
       parameters:
       - name: pr-id
@@ -280,34 +285,19 @@ spec:
           ttl: 24h
         EOF
 
-        # Wait for query completion (success or failure).
+        # Wait for query completion.
         kubectl wait --for=condition=Completed \
           --timeout=10m query/${query_name}
 
-        # Check if query failed with rate limit error.
+        # Argo's retryStrategy handles transient failures (e.g., rate limits).
+        # When ARK Query 'retryCount' is enabled, retries can move to the Query level.
+        # Check query status.
         phase=$(kubectl get query "${query_name}" -o jsonpath='{.status.phase}')
         if [ "${phase}" = "error" ]; then
           error_msg=$(kubectl get query "${query_name}" -o jsonpath='{.status.responses[0].raw}')
-          if echo "${error_msg}" | grep -q "429\|RateLimitReached"; then
-            echo "Rate limit hit, waiting 30s and retrying..." >&2
-            sleep 30
-
-            # Reset query by replacing without status to trigger reprocessing.
-            kubectl get query "${query_name}" -o json | \
-              jq 'del(.status)' | \
-              kubectl replace -f -
-
-            kubectl wait --for=condition=Completed \
-              --timeout=10m query/${query_name}
-            phase=$(kubectl get query "${query_name}" -o jsonpath='{.status.phase}')
-          fi
-
-          if [ "${phase}" = "error" ]; then
-            error_msg=$(kubectl get query "${query_name}" -o jsonpath='{.status.responses[0].raw}')
-            echo "Query failed: ${error_msg}" >&2
-            echo "ERROR: Query failed after retry - ${error_msg}" > /tmp/review-summary.txt
-            exit 1
-          fi
+          echo "Query failed: ${error_msg}" >&2
+          echo "ERROR: ${error_msg}" > /tmp/review-summary.txt
+          exit 1
         fi
 
         # Get review content from query response.
