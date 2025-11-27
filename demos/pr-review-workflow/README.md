@@ -30,7 +30,7 @@ The workflow pauses for approval, displaying the PRs to be reviewed. This allows
 
 **Agentic Review of Pull Requests against Configurable Standards**
 
-An agent is used to review each pull request, against a configurable and version controlled set of standards, via MCP. TODO note that model could be configured based on complexity/scope.
+An agent reviews each pull request against configurable standards via MCP. Failed reviews are automatically retried with exponential backoff to handle rate limits.
 
 **Optional Commentary on Pull Requests, with Attribution**
 

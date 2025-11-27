@@ -233,7 +233,7 @@ spec:
       annotations:
         workflows.argoproj.io/description: "Review a PR using an agent"
     retryStrategy:
-      limit: 2
+      limit: 5
       backoff:
         duration: "30s"
         factor: 2
