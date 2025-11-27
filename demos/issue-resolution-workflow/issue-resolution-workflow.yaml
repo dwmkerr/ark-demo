@@ -337,9 +337,24 @@ spec:
         fi
         analysis_content=$(cat "${analysis_file}")
 
+        # Get issue author for @ mention.
+        issue_author=$(curl -sS \
+          -H "Authorization: token ${GH_TOKEN}" \
+          "https://api.github.com/repos/${repo}/issues/${issue_id}" \
+          | jq -r '.user.login')
+
+        # Check if clarification is needed (look for questions section).
+        if echo "${analysis_content}" | grep -qiE "(questions for|clarification|more information|please provide)"; then
+          mention_line="@${issue_author} - This analysis includes questions that may help clarify the issue."
+        else
+          mention_line=""
+        fi
+
         # Build comment with summary and clarification request if needed.
         comment_body="${marker}
         ## Issue Analysis by Agent ${agent_name}
+
+        ${mention_line}
 
         <details>
         <summary>Click to expand analysis</summary>
