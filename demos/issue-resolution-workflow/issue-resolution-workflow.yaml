@@ -41,6 +41,9 @@ spec:
     - name: post-comment
       value: "false"
       description: "Post analysis as comment on issue (requires gh-token)"
+      enum:
+        - "true"
+        - "false"
 
     - name: issue-resolution-agent
       value: "issue-resolution-agent"
