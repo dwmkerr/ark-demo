@@ -5,7 +5,10 @@ metadata:
   annotations:
     workflows.argoproj.io/title: "Cleanup Issue Resolution Comments"
     workflows.argoproj.io/description: |
-      Deletes AI analysis comments (with <!-- ark-issue-resolution --> marker) from issues.
+      Deletes AI analysis and plan comments from issues and removes labels.
+
+      Markers cleaned: <!-- ark:issue-analysis -->, <!-- ark:plan -->
+      Labels removed: ark:planning:in-progress
 
       Requires a GitHub token with write access to the repository.
 spec:
@@ -144,34 +147,36 @@ spec:
         issue_id="{{inputs.parameters.issue-id}}"
         repo="{{workflow.parameters.github-repo}}"
         workflow_id="{{workflow.name}}"
-        marker="<!-- ark-issue-resolution -->"
         result_file="/workspace/${workflow_id}/${issue_id}.txt"
 
         mkdir -p "/workspace/${workflow_id}"
 
-        echo "Checking issue #${issue_id} for AI analysis comments..."
+        echo "Checking issue #${issue_id} for AI comments..."
 
-        # Find comments with marker.
-        comment_ids=$(curl -sS \
+        # Find comments with either marker
+        comments_json=$(curl -sS \
           -H "Authorization: token ${GH_TOKEN}" \
-          "https://api.github.com/repos/${repo}/issues/${issue_id}/comments" \
-          | jq -r ".[] | select(.body | contains(\"${marker}\")) | .id")
+          "https://api.github.com/repos/${repo}/issues/${issue_id}/comments")
 
-        if [ -z "${comment_ids}" ]; then
-          echo "0" > "${result_file}"
-          echo "No AI analysis comments found on issue #${issue_id}"
-          exit 0
+        comment_ids=$(echo "$comments_json" | jq -r \
+          '.[] | select(.body | (contains("<!-- ark:issue-analysis -->") or contains("<!-- ark:plan -->"))) | .id')
+
+        count=0
+        if [ -n "${comment_ids}" ]; then
+          for comment_id in ${comment_ids}; do
+            echo "Deleting comment ${comment_id}..."
+            curl -sS -X DELETE \
+              -H "Authorization: token ${GH_TOKEN}" \
+              "https://api.github.com/repos/${repo}/issues/comments/${comment_id}"
+            count=$((count + 1))
+          done
         fi
 
-        # Delete each comment and count.
-        count=0
-        for comment_id in ${comment_ids}; do
-          echo "Deleting comment ${comment_id}..."
-          curl -sS -X DELETE \
-            -H "Authorization: token ${GH_TOKEN}" \
-            "https://api.github.com/repos/${repo}/issues/comments/${comment_id}"
-          count=$((count + 1))
-        done
+        # Remove label
+        curl -sS -X DELETE \
+          -H "Authorization: token ${GH_TOKEN}" \
+          "https://api.github.com/repos/${repo}/issues/${issue_id}/labels/ark%3Aplanning%3Ain-progress" \
+          2>/dev/null || true
 
         echo "${count}" > "${result_file}"
         echo "Deleted ${count} comments from issue #${issue_id}"

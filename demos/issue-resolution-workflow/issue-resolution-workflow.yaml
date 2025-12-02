@@ -556,16 +556,21 @@ spec:
           echo "Repository: <a href=\"https://github.com/${repo}\">${repo}</a></p>"
           echo "<h2>Analyzed Issues</h2>"
           echo "<table border=\"1\" cellpadding=\"8\" cellspacing=\"0\">"
-          echo "<tr><th>Issue</th><th>Title</th><th>Analysis</th></tr>"
+          echo "<tr><th>Issue</th><th>Title</th><th>Analysis</th><th>Plan</th></tr>"
         } > "${summary_html}"
 
         jq -r '.[] | "\(.number)|\(.title)|\(.url)"' "${issues_json}" | while IFS='|' read -r number title url; do
           if [ -f "${workspace_path}/${number}/analysis.md" ]; then
-            analysis_cell="Available"
+            analysis_cell="✓"
           else
             analysis_cell="-"
           fi
-          echo "<tr><td><a href=\"${url}\">#${number}</a></td><td>${title}</td><td>${analysis_cell}</td></tr>" >> "${summary_html}"
+          if [ -f "${workspace_path}/${number}/plan.md" ]; then
+            plan_cell="✓"
+          else
+            plan_cell="-"
+          fi
+          echo "<tr><td><a href=\"${url}\">#${number}</a></td><td>${title}</td><td>${analysis_cell}</td><td>${plan_cell}</td></tr>" >> "${summary_html}"
         done
 
         echo "</table>" >> "${summary_html}"
