@@ -114,13 +114,14 @@ spec:
           title=$(echo "$issue" | jq -r '.title')
           url=$(echo "$issue" | jq -r '.html_url')
 
-          # Check if already synced
+          # Check if already synced (use 0 if search fails)
           search_query="repo:${target_repo} is:issue in:body ${url}"
           existing=$(curl -sS -H "Authorization: token ${GH_TOKEN}" \
             "https://api.github.com/search/issues?q=$(echo "$search_query" | jq -sRr @uri)" \
-            | jq '.total_count')
+            | jq '.total_count // 0')
+          existing=${existing:-0}
 
-          if [ "$existing" -gt 0 ]; then
+          if [ "$existing" -gt 0 ] 2>/dev/null; then
             status="skip"
           else
             status="pending"
@@ -218,13 +219,14 @@ spec:
           body=$(echo "$issue" | jq -r '.body // ""')
           url=$(echo "$issue" | jq -r '.html_url')
 
-          # Check if already synced
+          # Check if already synced (use 0 if search fails)
           search_query="repo:${target_repo} is:issue in:body ${url}"
           existing=$(curl -sS -H "Authorization: token ${GH_TOKEN}" \
             "https://api.github.com/search/issues?q=$(echo "$search_query" | jq -sRr @uri)" \
-            | jq '.total_count')
+            | jq '.total_count // 0')
+          existing=${existing:-0}
 
-          if [ "$existing" -gt 0 ]; then
+          if [ "$existing" -gt 0 ] 2>/dev/null; then
             echo "Skip #${number} (exists)"
             echo "{\"source\":${number},\"target\":null,\"status\":\"skipped\"}" >> /tmp/results.json
           else
@@ -239,8 +241,9 @@ spec:
               -d @/tmp/new-issue.json)
 
             new_number=$(echo "$response" | jq -r '.number')
+            error_msg=$(echo "$response" | jq -r '.message // empty')
 
-            if [ "$new_number" != "null" ]; then
+            if [ "$new_number" != "null" ] && [ -n "$new_number" ]; then
               # Add label
               curl -sS -X POST \
                 -H "Authorization: token ${GH_TOKEN}" \
@@ -250,7 +253,7 @@ spec:
               echo "Synced #${number} -> #${new_number}"
               echo "{\"source\":${number},\"target\":${new_number},\"status\":\"synced\"}" >> /tmp/results.json
             else
-              echo "Failed #${number}"
+              echo "Failed #${number}: ${error_msg}"
               echo "{\"source\":${number},\"target\":null,\"status\":\"failed\"}" >> /tmp/results.json
             fi
           fi
