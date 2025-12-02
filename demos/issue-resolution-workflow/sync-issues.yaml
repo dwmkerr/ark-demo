@@ -89,13 +89,15 @@ spec:
 
         # Fetch issues from source
         if [ -n "$issue_ids" ]; then
-          issues_json="[]"
+          echo "[]" > /tmp/issues.json
           for id in $(echo "$issue_ids" | tr ',' ' '); do
             issue=$(curl -sS \
               -H "Authorization: token ${GH_TOKEN}" \
               "https://api.github.com/repos/${source_repo}/issues/${id}")
-            issues_json=$(echo "$issues_json" | jq --argjson issue "$issue" '. + [$issue]')
+            jq --argjson issue "$issue" '. + [$issue]' /tmp/issues.json > /tmp/issues-new.json
+            mv /tmp/issues-new.json /tmp/issues.json
           done
+          issues_json=$(cat /tmp/issues.json)
         else
           api_url="https://api.github.com/repos/${source_repo}/issues?state=open&per_page=100"
           [ -n "$label_filter" ] && api_url="${api_url}&labels=${label_filter}"
@@ -180,16 +182,18 @@ spec:
         # Initialize result
         echo "[]" > /tmp/sync-result.json
 
-        # Get issue IDs to sync
+        # Get issues to sync
         issue_ids="{{workflow.parameters.issue-ids}}"
         if [ -n "$issue_ids" ]; then
-          issues_json="[]"
+          echo "[]" > /tmp/issues.json
           for id in $(echo "$issue_ids" | tr ',' ' '); do
             issue=$(curl -sS \
               -H "Authorization: token ${GH_TOKEN}" \
               "https://api.github.com/repos/${source_repo}/issues/${id}")
-            issues_json=$(echo "$issues_json" | jq --argjson issue "$issue" '. + [$issue]')
+            jq --argjson issue "$issue" '. + [$issue]' /tmp/issues.json > /tmp/issues-new.json
+            mv /tmp/issues-new.json /tmp/issues.json
           done
+          issues_json=$(cat /tmp/issues.json)
         else
           label_filter="{{workflow.parameters.label-filter}}"
           api_url="https://api.github.com/repos/${source_repo}/issues?state=open&per_page=100"
