@@ -87,7 +87,6 @@ The workflow uses HTML comment markers to identify and update specific comments:
 
 | Marker | Purpose |
 |--------|---------|
-| `<!-- ark:issue-analysis -->` | Issue analysis comment |
 | `<!-- ark:plan -->` | Implementation plan comment |
 
 ## TODO

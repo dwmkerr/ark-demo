@@ -5,9 +5,9 @@ metadata:
   annotations:
     workflows.argoproj.io/title: "Cleanup Issue Resolution Comments"
     workflows.argoproj.io/description: |
-      Deletes AI analysis and plan comments from issues and removes labels.
+      Deletes plan comments from issues and removes labels.
 
-      Markers cleaned: <!-- ark:issue-analysis -->, <!-- ark:plan -->
+      Markers cleaned: <!-- ark:plan -->
       Labels removed: ark:planning:in-progress
 
       Requires a GitHub token with write access to the repository.
@@ -159,7 +159,7 @@ spec:
           "https://api.github.com/repos/${repo}/issues/${issue_id}/comments")
 
         comment_ids=$(echo "$comments_json" | jq -r \
-          '.[] | select(.body | (contains("<!-- ark:issue-analysis -->") or contains("<!-- ark:plan -->"))) | .id')
+          '.[] | select(.body | contains("<!-- ark:plan -->")) | .id')
 
         count=0
         if [ -n "${comment_ids}" ]; then
