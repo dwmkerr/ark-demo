@@ -58,14 +58,6 @@ spec:
         template: sync
         depends: "request-approval"
 
-      - name: finalize
-        template: finalize
-        depends: "sync"
-        arguments:
-          artifacts:
-          - name: sync-result
-            from: "{{tasks.sync.outputs.artifacts.sync-result}}"
-
   - name: prepare
     metadata:
       annotations:
@@ -87,35 +79,35 @@ spec:
         echo "Preparing sync from ${source_repo} to ${target_repo}"
         echo ""
 
+        # Initialize
+        echo "[]" > /tmp/issues.json
+        echo "[]" > /tmp/sync-plan.json
+
         # Fetch issues from source
         if [ -n "$issue_ids" ]; then
-          echo "[]" > /tmp/issues.json
           for id in $(echo "$issue_ids" | tr ',' ' '); do
-            issue=$(curl -sS \
-              -H "Authorization: token ${GH_TOKEN}" \
-              "https://api.github.com/repos/${source_repo}/issues/${id}")
-            jq --argjson issue "$issue" '. + [$issue]' /tmp/issues.json > /tmp/issues-new.json
+            curl -sS -H "Authorization: token ${GH_TOKEN}" \
+              "https://api.github.com/repos/${source_repo}/issues/${id}" \
+              > /tmp/issue.json
+            jq -s '.[0] + [.[1]]' /tmp/issues.json /tmp/issue.json > /tmp/issues-new.json
             mv /tmp/issues-new.json /tmp/issues.json
           done
-          issues_json=$(cat /tmp/issues.json)
         else
           api_url="https://api.github.com/repos/${source_repo}/issues?state=open&per_page=100"
           [ -n "$label_filter" ] && api_url="${api_url}&labels=${label_filter}"
-          issues_json=$(curl -sS -H "Authorization: token ${GH_TOKEN}" "$api_url" \
-            | jq '[.[] | select(.pull_request == null)]')
+          curl -sS -H "Authorization: token ${GH_TOKEN}" "$api_url" \
+            | jq '[.[] | select(type == "object") | select(.pull_request == null)]' > /tmp/issues.json
         fi
 
         # Build sync plan
-        sync_plan="[]"
-        echo "$issues_json" | jq -c '.[]' | while read -r issue; do
+        jq -c '.[]' /tmp/issues.json | while read -r issue; do
           number=$(echo "$issue" | jq -r '.number')
           title=$(echo "$issue" | jq -r '.title')
           url=$(echo "$issue" | jq -r '.html_url')
 
           # Check if already synced
           search_query="repo:${target_repo} is:issue in:body ${url}"
-          existing=$(curl -sS \
-            -H "Authorization: token ${GH_TOKEN}" \
+          existing=$(curl -sS -H "Authorization: token ${GH_TOKEN}" \
             "https://api.github.com/search/issues?q=$(echo "$search_query" | jq -sRr @uri)" \
             | jq '.total_count')
 
@@ -125,15 +117,20 @@ spec:
             status="pending"
           fi
 
-          echo "{\"source_number\":${number},\"source_url\":\"${url}\",\"title\":\"${title}\",\"status\":\"${status}\"}"
-        done | jq -s '.' > /tmp/sync-plan.json
+          echo "{\"source_number\":${number},\"source_url\":\"${url}\",\"title\":$(echo "$title" | jq -R .),\"status\":\"${status}\"}" >> /tmp/plan-items.json
+        done
+
+        # Combine into array
+        if [ -f /tmp/plan-items.json ]; then
+          jq -s '.' /tmp/plan-items.json > /tmp/sync-plan.json
+        fi
 
         # Display plan
         echo "## Sync Plan"
         echo ""
         echo "| Source | Title | Status |"
         echo "|--------|-------|--------|"
-        jq -r '.[] | "| [#\(.source_number)](\(.source_url)) | \(.title | .[0:50]) | \(.status) |"' /tmp/sync-plan.json
+        jq -r '.[] | "| #\(.source_number) | \(.title[0:50]) | \(.status) |"' /tmp/sync-plan.json
 
         pending=$(jq '[.[] | select(.status == "pending")] | length' /tmp/sync-plan.json)
         skip=$(jq '[.[] | select(.status == "skip")] | length' /tmp/sync-plan.json)
@@ -175,34 +172,34 @@ spec:
         source_repo="{{workflow.parameters.source-repo}}"
         target_repo="{{workflow.parameters.target-repo}}"
         sync_label="{{workflow.parameters.sync-label}}"
+        issue_ids="{{workflow.parameters.issue-ids}}"
+        label_filter="{{workflow.parameters.label-filter}}"
 
         echo "Syncing issues to ${target_repo}"
         echo ""
 
-        # Initialize result
+        # Initialize
+        echo "[]" > /tmp/issues.json
         echo "[]" > /tmp/sync-result.json
 
-        # Get issues to sync
-        issue_ids="{{workflow.parameters.issue-ids}}"
+        # Fetch issues
         if [ -n "$issue_ids" ]; then
-          echo "[]" > /tmp/issues.json
           for id in $(echo "$issue_ids" | tr ',' ' '); do
-            issue=$(curl -sS \
-              -H "Authorization: token ${GH_TOKEN}" \
-              "https://api.github.com/repos/${source_repo}/issues/${id}")
-            jq --argjson issue "$issue" '. + [$issue]' /tmp/issues.json > /tmp/issues-new.json
+            curl -sS -H "Authorization: token ${GH_TOKEN}" \
+              "https://api.github.com/repos/${source_repo}/issues/${id}" \
+              > /tmp/issue.json
+            jq -s '.[0] + [.[1]]' /tmp/issues.json /tmp/issue.json > /tmp/issues-new.json
             mv /tmp/issues-new.json /tmp/issues.json
           done
-          issues_json=$(cat /tmp/issues.json)
         else
-          label_filter="{{workflow.parameters.label-filter}}"
           api_url="https://api.github.com/repos/${source_repo}/issues?state=open&per_page=100"
           [ -n "$label_filter" ] && api_url="${api_url}&labels=${label_filter}"
-          issues_json=$(curl -sS -H "Authorization: token ${GH_TOKEN}" "$api_url" \
-            | jq '[.[] | select(.pull_request == null)]')
+          curl -sS -H "Authorization: token ${GH_TOKEN}" "$api_url" \
+            | jq '[.[] | select(type == "object") | select(.pull_request == null)]' > /tmp/issues.json
         fi
 
-        echo "$issues_json" | jq -c '.[]' | while read -r issue; do
+        # Sync each issue
+        jq -c '.[]' /tmp/issues.json | while read -r issue; do
           number=$(echo "$issue" | jq -r '.number')
           title=$(echo "$issue" | jq -r '.title')
           body=$(echo "$issue" | jq -r '.body // ""')
@@ -210,92 +207,57 @@ spec:
 
           # Check if already synced
           search_query="repo:${target_repo} is:issue in:body ${url}"
-          existing=$(curl -sS \
-            -H "Authorization: token ${GH_TOKEN}" \
+          existing=$(curl -sS -H "Authorization: token ${GH_TOKEN}" \
             "https://api.github.com/search/issues?q=$(echo "$search_query" | jq -sRr @uri)" \
             | jq '.total_count')
 
           if [ "$existing" -gt 0 ]; then
-            echo "Skipping #${number} (already synced)"
-            result="{\"source_number\":${number},\"source_url\":\"${url}\",\"target_number\":null,\"target_url\":null,\"status\":\"skipped\"}"
+            echo "Skip #${number} (exists)"
+            echo "{\"source\":${number},\"target\":null,\"status\":\"skipped\"}" >> /tmp/results.json
           else
-            # Build new issue body
-            new_body="> **Original:** [${source_repo}#${number}](${url})
+            # Create issue with link to original
+            new_body=$(printf "> **Original:** [%s#%s](%s)\n\n%s" "${source_repo}" "${number}" "${url}" "${body}")
+            jq -n --arg title "$title" --arg body "$new_body" '{title: $title, body: $body}' > /tmp/new-issue.json
 
-        ${body}"
-
-            # Create issue
-            new_issue=$(jq -n --arg title "$title" --arg body "$new_body" '{title: $title, body: $body}')
             response=$(curl -sS -X POST \
               -H "Authorization: token ${GH_TOKEN}" \
               -H "Accept: application/vnd.github.v3+json" \
               "https://api.github.com/repos/${target_repo}/issues" \
-              -d "$new_issue")
+              -d @/tmp/new-issue.json)
 
             new_number=$(echo "$response" | jq -r '.number')
-            new_url=$(echo "$response" | jq -r '.html_url')
 
-            if [ "$new_number" = "null" ]; then
-              echo "Failed to sync #${number}"
-              result="{\"source_number\":${number},\"source_url\":\"${url}\",\"target_number\":null,\"target_url\":null,\"status\":\"failed\"}"
-            else
+            if [ "$new_number" != "null" ]; then
               # Add label
               curl -sS -X POST \
                 -H "Authorization: token ${GH_TOKEN}" \
-                -H "Accept: application/vnd.github.v3+json" \
                 "https://api.github.com/repos/${target_repo}/issues/${new_number}/labels" \
                 -d "{\"labels\":[\"${sync_label}\"]}" >/dev/null 2>&1 || true
 
               echo "Synced #${number} -> #${new_number}"
-              result="{\"source_number\":${number},\"source_url\":\"${url}\",\"target_number\":${new_number},\"target_url\":\"${new_url}\",\"status\":\"synced\"}"
+              echo "{\"source\":${number},\"target\":${new_number},\"status\":\"synced\"}" >> /tmp/results.json
+            else
+              echo "Failed #${number}"
+              echo "{\"source\":${number},\"target\":null,\"status\":\"failed\"}" >> /tmp/results.json
             fi
           fi
-
-          # Append to result
-          jq --argjson r "$result" '. + [$r]' /tmp/sync-result.json > /tmp/sync-result-new.json
-          mv /tmp/sync-result-new.json /tmp/sync-result.json
         done
 
-        cat /tmp/sync-result.json
-    outputs:
-      artifacts:
-      - name: sync-result
-        path: /tmp/sync-result.json
-        archive:
-          none: {}
+        # Build final result
+        if [ -f /tmp/results.json ]; then
+          jq -s '.' /tmp/results.json > /tmp/sync-result.json
+        fi
 
-  - name: finalize
-    metadata:
-      annotations:
-        workflows.argoproj.io/description: "Display final sync results"
-    inputs:
-      artifacts:
-      - name: sync-result
-        path: /tmp/sync-result.json
-    script:
-      image: badouralix/curl-jq:latest
-      command: [sh]
-      source: |
-        set -e -o pipefail
-
-        echo "## Sync Results"
         echo ""
-        echo "| Source | Target | Status |"
-        echo "|--------|--------|--------|"
-        jq -r '.[] | "| [#\(.source_number)](\(.source_url)) | \(if .target_number then "[#\(.target_number)](\(.target_url))" else "-" end) | \(.status) |"' /tmp/sync-result.json
+        echo "## Results"
+        jq -r '.[] | "Source #\(.source) -> Target #\(.target // "n/a") (\(.status))"' /tmp/sync-result.json
 
         synced=$(jq '[.[] | select(.status == "synced")] | length' /tmp/sync-result.json)
-        skipped=$(jq '[.[] | select(.status == "skipped")] | length' /tmp/sync-result.json)
-        failed=$(jq '[.[] | select(.status == "failed")] | length' /tmp/sync-result.json)
-
         echo ""
-        echo "**Synced:** ${synced} | **Skipped:** ${skipped} | **Failed:** ${failed}"
-
-        # Copy to output
-        cp /tmp/sync-result.json /tmp/final-result.json
+        echo "**Synced:** ${synced}"
     outputs:
       artifacts:
       - name: sync-result
-        path: /tmp/final-result.json
+        path: /tmp/sync-result.json
         archive:
           none: {}
