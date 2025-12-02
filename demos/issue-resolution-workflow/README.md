@@ -4,6 +4,12 @@ This workflow reviews open issues in a GitHub repository and uses an agent to su
 
 For detailed explanation of the workflow structure and Ark/Argo concepts, see the [PR Review Workflow](../pr-review-workflow/README.md).
 
+## Labels
+
+| Label | Purpose |
+|-------|---------|
+| `ark:planning:in-progress` | Added when an implementation plan is submitted to an issue |
+
 ## Installation
 
 Ensure [Ark](http://github.com/mckinsey/agents-at-scale-ark) and Argo Workflows are installed:
@@ -69,6 +75,41 @@ kubectl port-forward svc/ark-dashboard 8080:8080 &          # http://localhost:8
 |-----------|---------|-------------|
 | `github-repo` | `mckinsey/agents-at-scale-ark` | Repository in org/repo format |
 | `issue-resolution-agent` | `issue-resolution-agent` | Agent name for issue analysis |
+| `planner-agent` | `planner-agent` | Agent name for implementation planning |
 | `updated-since` | `2000-01-01T00:00:00Z` | Only review issues updated since this timestamp |
 | `issue-ids` | (empty) | Comma-separated issue IDs to review (if empty, uses all open issues) |
+| `label-filter` | (empty) | Only include issues with this label |
 | `gh-token` | (empty) | GitHub token for API access |
+
+## Comment Markers
+
+The workflow uses HTML comment markers to identify and update specific comments:
+
+| Marker | Purpose |
+|--------|---------|
+| `<!-- ark:issue-analysis -->` | Issue analysis comment |
+| `<!-- ark:plan -->` | Implementation plan comment |
+
+## TODO
+
+Agent Flow
+
+**Planner**
+
+Creates plan comment. Reviews all comments since previous plan. Incorporates and keeps up to date. Responds to comments if needed. Proposes the next steps.
+
+**Coder**
+
+Reviews the plan comment. Reviews instructions from the planner. Works, updates comments.
+
+**Tester**
+
+Reviews the plan comment. Reviews updates from the coder. Runs tests. updates comments.
+
+**Planner**
+
+Checks for completion.
+
+**Labels**
+
+ark:agent:backlog
