@@ -83,21 +83,30 @@ spec:
         echo "[]" > /tmp/issues.json
         echo "[]" > /tmp/sync-plan.json
 
-        # Fetch issues from source
+        # Fetch issues from source (no auth needed for public repos)
         if [ -n "$issue_ids" ]; then
           for id in $(echo "$issue_ids" | tr ',' ' '); do
-            curl -sS -H "Authorization: token ${GH_TOKEN}" \
-              "https://api.github.com/repos/${source_repo}/issues/${id}" \
-              > /tmp/issue.json
-            jq -s '.[0] + [.[1]]' /tmp/issues.json /tmp/issue.json > /tmp/issues-new.json
-            mv /tmp/issues-new.json /tmp/issues.json
+            response=$(curl -sS -w "\n%{http_code}" \
+              "https://api.github.com/repos/${source_repo}/issues/${id}")
+            http_code=$(echo "$response" | tail -1)
+            body=$(echo "$response" | sed '$d')
+            if [ "$http_code" = "200" ]; then
+              echo "$body" > /tmp/issue.json
+              jq -s '.[0] + [.[1]]' /tmp/issues.json /tmp/issue.json > /tmp/issues-new.json
+              mv /tmp/issues-new.json /tmp/issues.json
+            else
+              echo "Warning: Issue #${id} not found (HTTP ${http_code})" >&2
+            fi
           done
         else
           api_url="https://api.github.com/repos/${source_repo}/issues?state=open&per_page=100"
           [ -n "$label_filter" ] && api_url="${api_url}&labels=${label_filter}"
-          curl -sS -H "Authorization: token ${GH_TOKEN}" "$api_url" \
-            | jq '[.[] | select(type == "object") | select(.pull_request == null)]' > /tmp/issues.json
+          curl -sS "$api_url" \
+            | jq '[.[] | select(.pull_request == null)]' > /tmp/issues.json
         fi
+
+        issue_count=$(jq 'length' /tmp/issues.json)
+        echo "Found ${issue_count} issues to sync"
 
         # Build sync plan
         jq -c '.[]' /tmp/issues.json | while read -r issue; do
@@ -182,20 +191,24 @@ spec:
         echo "[]" > /tmp/issues.json
         echo "[]" > /tmp/sync-result.json
 
-        # Fetch issues
+        # Fetch issues (no auth needed for public repos)
         if [ -n "$issue_ids" ]; then
           for id in $(echo "$issue_ids" | tr ',' ' '); do
-            curl -sS -H "Authorization: token ${GH_TOKEN}" \
-              "https://api.github.com/repos/${source_repo}/issues/${id}" \
-              > /tmp/issue.json
-            jq -s '.[0] + [.[1]]' /tmp/issues.json /tmp/issue.json > /tmp/issues-new.json
-            mv /tmp/issues-new.json /tmp/issues.json
+            response=$(curl -sS -w "\n%{http_code}" \
+              "https://api.github.com/repos/${source_repo}/issues/${id}")
+            http_code=$(echo "$response" | tail -1)
+            body=$(echo "$response" | sed '$d')
+            if [ "$http_code" = "200" ]; then
+              echo "$body" > /tmp/issue.json
+              jq -s '.[0] + [.[1]]' /tmp/issues.json /tmp/issue.json > /tmp/issues-new.json
+              mv /tmp/issues-new.json /tmp/issues.json
+            fi
           done
         else
           api_url="https://api.github.com/repos/${source_repo}/issues?state=open&per_page=100"
           [ -n "$label_filter" ] && api_url="${api_url}&labels=${label_filter}"
-          curl -sS -H "Authorization: token ${GH_TOKEN}" "$api_url" \
-            | jq '[.[] | select(type == "object") | select(.pull_request == null)]' > /tmp/issues.json
+          curl -sS "$api_url" \
+            | jq '[.[] | select(.pull_request == null)]' > /tmp/issues.json
         fi
 
         # Sync each issue
