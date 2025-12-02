@@ -108,8 +108,9 @@ spec:
         issue_count=$(jq 'length' /tmp/issues.json)
         echo "Found ${issue_count} issues to sync"
 
-        # Build sync plan
+        # Build sync plan (sleep to avoid rate limits)
         jq -c '.[]' /tmp/issues.json | while read -r issue; do
+          sleep 2
           number=$(echo "$issue" | jq -r '.number')
           title=$(echo "$issue" | jq -r '.title')
           url=$(echo "$issue" | jq -r '.html_url')
@@ -212,8 +213,9 @@ spec:
             | jq '[.[] | select(.pull_request == null)]' > /tmp/issues.json
         fi
 
-        # Sync each issue
+        # Sync each issue (sleep to avoid rate limits)
         jq -c '.[]' /tmp/issues.json | while read -r issue; do
+          sleep 2
           number=$(echo "$issue" | jq -r '.number')
           title=$(echo "$issue" | jq -r '.title')
           body=$(echo "$issue" | jq -r '.body // ""')
