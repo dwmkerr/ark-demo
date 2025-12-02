@@ -61,6 +61,17 @@ Resume when prompted for approval:
 argo resume <workflow_name>
 ```
 
+**(Optional)** To avoid creating noise in the original repo, first sync issues to a working repo:
+
+```bash
+argo submit --from workflowtemplate/sync-issues \
+    -p source-repo=mckinsey/agents-at-scale-ark \
+    -p target-repo=dwmkerr/agents-at-scale-ark \
+    -p issue-ids=123,456 --watch
+```
+
+Then run the workflow against the working repo. Synced issues link back to the original.
+
 Open the dashboards to monitor progress and inspect outputs:
 
 ```bash
