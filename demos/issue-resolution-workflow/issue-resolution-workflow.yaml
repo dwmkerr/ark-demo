@@ -34,20 +34,21 @@ spec:
       value: ""
       description: "Comma-separated issue IDs to review (e.g., 234,56,2). If empty, uses all open issues matching filters."
 
+    - name: label-filter
+      value: ""
+      description: "Only include issues with this label (e.g., 'bug'). Empty means all issues."
+
     - name: gh-token
       value: ""
       description: "GitHub token for API access."
 
-    - name: post-comment
-      value: "false"
-      description: "Post analysis as comment on issue (requires gh-token)"
-      enum:
-        - "true"
-        - "false"
-
     - name: issue-resolution-agent
       value: "issue-resolution-agent"
       description: "Ark agent name for issue analysis"
+
+    - name: planner-agent
+      value: "planner-agent"
+      description: "Ark agent name for implementation planning"
 
   templates:
   - name: main
@@ -73,10 +74,18 @@ spec:
             value: "{{item}}"
         withParam: "{{tasks.prepare-and-validate.outputs.parameters.issue-ids}}"
 
-      - name: comment-on-issues
-        template: comment-on-issue
+      - name: create-plan
+        template: create-plan
         depends: "analyze-issues"
-        when: "{{workflow.parameters.post-comment}} == true"
+        arguments:
+          parameters:
+          - name: issue-id
+            value: "{{item}}"
+        withParam: "{{tasks.prepare-and-validate.outputs.parameters.issue-ids}}"
+
+      - name: submit-plan
+        template: submit-plan
+        depends: "create-plan"
         arguments:
           parameters:
           - name: issue-id
@@ -85,7 +94,7 @@ spec:
 
       - name: summarize
         template: summarize
-        depends: "(comment-on-issues.Succeeded || comment-on-issues.Skipped || comment-on-issues.Failed) || (analyze-issues.Succeeded || analyze-issues.Failed)"
+        depends: "submit-plan.Succeeded || submit-plan.Failed"
 
   - name: prepare-and-validate
     metadata:
@@ -110,10 +119,35 @@ spec:
         agent_name="{{workflow.parameters.issue-resolution-agent}}"
         kubectl get agent "${agent_name}"
 
+        # Validate GitHub token if provided
+        gh_token="{{workflow.parameters.gh-token}}"
+        gh_user=""
+        gh_scopes=""
+        gh_token_type=""
+        if [ -n "${gh_token}" ]; then
+          token_response=$(curl -sS -D - -o /tmp/user.json \
+            -H "Authorization: token ${gh_token}" \
+            "https://api.github.com/user" 2>/dev/null)
+          http_code=$(echo "$token_response" | grep -i "^HTTP" | tail -1 | awk '{print $2}')
+          if [ "$http_code" = "200" ]; then
+            gh_user=$(jq -r '.login // empty' /tmp/user.json)
+            gh_scopes=$(echo "$token_response" | grep -i "^x-oauth-scopes:" | cut -d: -f2- | tr -d '\r' | xargs)
+            if [ -n "$gh_scopes" ]; then
+              gh_token_type="classic"
+            else
+              gh_token_type="⚠️ fine-grained (scopes not available)"
+            fi
+          else
+            gh_user="validation failed (HTTP ${http_code})"
+            gh_token_type="unknown"
+          fi
+        fi
+
         # Fetch issues
         repo="{{workflow.parameters.github-repo}}"
         issue_ids_param="{{workflow.parameters.issue-ids}}"
         updated_since="{{workflow.parameters.updated-since}}"
+        label_filter="{{workflow.parameters.label-filter}}"
         workflow_id="{{workflow.name}}"
         workspace_path="/workspace/${workflow_id}"
         mkdir -p "${workspace_path}"
@@ -127,7 +161,7 @@ spec:
             http_code=$(echo "$response" | tail -1)
             body=$(echo "$response" | sed '$d')
             if [ "$http_code" = "200" ]; then
-              echo "$body" | jq '{number: .number, title: .title, url: .html_url}' > /tmp/issue.json
+              echo "$body" | jq '{number: .number, title: .title, url: .html_url, labels: [.labels[].name]}' > /tmp/issue.json
               jq -s '.[0] + [.[1]]' "${issues_json}" /tmp/issue.json > /tmp/merged.json
               mv /tmp/merged.json "${issues_json}"
             else
@@ -135,23 +169,16 @@ spec:
             fi
           done
         else
-          curl -sS \
-            "https://api.github.com/repos/${repo}/issues?state=open&per_page=100" \
+          api_url="https://api.github.com/repos/${repo}/issues?state=open&per_page=100"
+          [ -n "$label_filter" ] && api_url="${api_url}&labels=${label_filter}"
+          curl -sS "${api_url}" \
             | jq --arg since "${updated_since}" \
-              '[.[] | select(.pull_request == null) | select(.updated_at > $since) | {number: .number, title: .title, url: .html_url}]' \
+              '[.[] | select(.pull_request == null) | select(.updated_at > $since) | {number: .number, title: .title, url: .html_url, labels: [.labels[].name]}]' \
             > "${issues_json}"
         fi
 
         # Generate workflow plan
-        gh_token="{{workflow.parameters.gh-token}}"
-        if [ -n "$gh_token" ]; then
-          gh_token_display="$(printf '%*s' $((${#gh_token} - 3)) '' | tr ' ' '*')${gh_token: -3}"
-        else
-          gh_token_display="not provided"
-        fi
         issue_count=$(jq 'length' "${issues_json}")
-
-        post_comment="{{workflow.parameters.post-comment}}"
 
         cat > /tmp/workflow-plan.md <<EOF
         # Issue Resolution Workflow Plan
@@ -160,8 +187,10 @@ spec:
         - **Repository:** ${repo}
         - **Agent:** ${agent_name}
         - **Updated Since:** ${updated_since}
-        - **GitHub Token:** ${gh_token_display}
-        - **Post Comments:** ${post_comment}
+        - **Label Filter:** ${label_filter:-all}
+        - **GitHub Token User:** ${gh_user:-not provided}
+        - **GitHub Token Type:** ${gh_token_type:-⚠️ n/a}
+        - **GitHub Token Scopes:** ${gh_scopes:-⚠️ n/a}
 
         ## Issues to Analyze (${issue_count})
 
@@ -307,10 +336,120 @@ spec:
         archive:
           none: {}
 
-  - name: comment-on-issue
+  - name: create-plan
     metadata:
       annotations:
-        workflows.argoproj.io/description: "Post analysis comment to issue"
+        workflows.argoproj.io/description: "Create implementation plan for an issue"
+    inputs:
+      parameters:
+      - name: issue-id
+    script:
+      image: alpine/k8s:1.28.13
+      command: [sh]
+      volumeMounts:
+      - name: workspace
+        mountPath: /workspace
+      source: |
+        set -e -o pipefail
+        apk add --no-cache jq >/dev/null 2>&1
+
+        issue_id="{{inputs.parameters.issue-id}}"
+        workflow_id="{{workflow.name}}"
+        workspace_path="/workspace/${workflow_id}/${issue_id}"
+        analysis_file="${workspace_path}/analysis.md"
+        max_retries=3
+        retry_wait=300
+
+        if [ ! -f "${analysis_file}" ]; then
+          echo "Analysis file not found: ${analysis_file}" >&2
+          exit 1
+        fi
+        analysis_content=$(cat "${analysis_file}")
+
+        # Build the prompt with analysis content
+        prompt_text="Create an implementation plan for issue #${issue_id} in repository {{workflow.parameters.github-repo}}.
+
+        Here is the issue analysis:
+        ${analysis_content}
+
+        Based on this analysis, create a detailed implementation plan in Markdown format:
+
+        ## Specification
+        - Exact changes required (files, functions, APIs)
+        - Data structures or schemas if applicable
+        - Edge cases to handle
+
+        ## Implementation Steps
+        1. [First step with specific details]
+        2. [Second step...]
+
+        ## Testing Plan
+        - Unit tests to add
+        - Integration tests if needed
+
+        ## Acceptance Criteria
+        - [ ] Criterion 1
+        - [ ] Criterion 2"
+
+        for attempt in $(seq 1 $max_retries); do
+          query_name="${workflow_id}-plan-${issue_id}-${attempt}"
+          echo "Attempt ${attempt}/${max_retries} for issue #${issue_id}" >&2
+
+          # Use jq to properly escape the prompt content
+          jq -n \
+            --arg name "${query_name}" \
+            --arg workflow "{{workflow.name}}" \
+            --arg input "$prompt_text" \
+            --arg agent "{{workflow.parameters.planner-agent}}" \
+            '{
+              apiVersion: "ark.mckinsey.com/v1alpha1",
+              kind: "Query",
+              metadata: {
+                name: $name,
+                labels: { workflow: $workflow }
+              },
+              spec: {
+                input: $input,
+                targets: [{ type: "agent", name: $agent }],
+                sessionId: $workflow,
+                timeout: "10m",
+                ttl: "24h"
+              }
+            }' | kubectl create -f - >&2
+
+          kubectl wait --for=condition=Completed --timeout=10m query/${query_name}
+
+          phase=$(kubectl get query "${query_name}" -o jsonpath='{.status.phase}')
+          if [ "${phase}" != "error" ]; then
+            plan_content=$(kubectl get query "${query_name}" -o jsonpath='{.status.responses[0].content}')
+            mkdir -p "${workspace_path}"
+            echo "${plan_content}" > "${workspace_path}/plan.md"
+            cat "${workspace_path}/plan.md" | tee /tmp/plan.md
+            exit 0
+          fi
+
+          error_msg=$(kubectl get query "${query_name}" -o jsonpath='{.status.responses[0].raw}')
+          echo "Query failed: ${error_msg}" >&2
+
+          if [ "$attempt" -lt "$max_retries" ]; then
+            echo "Waiting ${retry_wait}s before retry..." >&2
+            sleep $retry_wait
+          fi
+        done
+
+        echo "ERROR: All ${max_retries} attempts failed" > /tmp/plan.md
+        exit 1
+    outputs:
+      artifacts:
+      - name: plan
+        path: /tmp/plan.md
+        archive:
+          none: {}
+
+  - name: submit-plan
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Post implementation plan to issue"
     inputs:
       parameters:
       - name: issue-id
@@ -329,79 +468,66 @@ spec:
         issue_id="{{inputs.parameters.issue-id}}"
         repo="{{workflow.parameters.github-repo}}"
         workflow_id="{{workflow.name}}"
-        agent_name="{{workflow.parameters.issue-resolution-agent}}"
-        analysis_file="/workspace/${workflow_id}/${issue_id}/analysis.md"
-        marker="<!-- ark-issue-resolution -->"
+        plan_file="/workspace/${workflow_id}/${issue_id}/plan.md"
+        marker="<!-- ark:plan -->"
 
-        # Check if analysis exists.
-        if [ ! -f "${analysis_file}" ]; then
-          echo "Analysis file not found: ${analysis_file}" >&2
+        if [ ! -f "${plan_file}" ]; then
+          echo "Plan file not found: ${plan_file}" >&2
           exit 1
         fi
-        analysis_content=$(cat "${analysis_file}")
+        plan_content=$(cat "${plan_file}")
 
-        # Get issue author for @ mention.
-        issue_author=$(curl -sS \
+        # Build comment body and save to file for safe JSON encoding
+        {
+          echo "${marker}"
+          echo "## Implementation Plan"
+          echo ""
+          echo "<details>"
+          echo "<summary>Click to expand plan</summary>"
+          echo ""
+          cat "${plan_file}"
+          echo ""
+          echo "</details>"
+          echo ""
+          echo "---"
+          echo "*Generated by [Issue Resolution Workflow](https://github.com/dwmkerr/ark-demo) (${workflow_id})*"
+        } > /tmp/comment_body.txt
+
+        # Check for existing plan comment
+        comments_response=$(curl -sS \
           -H "Authorization: token ${GH_TOKEN}" \
-          "https://api.github.com/repos/${repo}/issues/${issue_id}" \
-          | jq -r '.user.login')
+          "https://api.github.com/repos/${repo}/issues/${issue_id}/comments")
 
-        # Check if clarification is needed (look for questions section).
-        if echo "${analysis_content}" | grep -qiE "(questions for|clarification|more information|please provide)"; then
-          mention_line="@${issue_author} - This analysis includes questions that may help clarify the issue."
-        else
-          mention_line=""
-        fi
+        existing_id=$(echo "$comments_response" | jq -r --arg marker "$marker" \
+          'if type == "array" then .[] | select(.body | contains($marker)) | .id else empty end' | head -1)
 
-        # Build comment with summary and clarification request if needed.
-        comment_body="${marker}
-        ## Issue Analysis by Agent ${agent_name}
+        # Create JSON payload from file
+        json_payload=$(jq -n --rawfile body /tmp/comment_body.txt '{body: $body}')
 
-        ${mention_line}
-
-        <details>
-        <summary>Click to expand analysis</summary>
-
-        ${analysis_content}
-
-        </details>
-
-        ---
-        *Generated by [Issue Resolution Workflow](https://github.com/dwmkerr/ark-demo) (${workflow_id})*"
-
-        # Check for existing comment with marker.
-        existing_comment_id=$(curl -sS \
-          -H "Authorization: token ${GH_TOKEN}" \
-          -H "Accept: application/vnd.github.v3+json" \
-          "https://api.github.com/repos/${repo}/issues/${issue_id}/comments" \
-          | jq -r ".[] | select(.body | contains(\"${marker}\")) | .id" | head -1)
-
-        if [ -n "${existing_comment_id}" ]; then
-          # Update existing comment.
-          echo "Updating existing comment ${existing_comment_id}..." >&2
-          response=$(curl -sS -w "\n%{http_code}" -X PATCH \
+        if [ -n "${existing_id}" ]; then
+          curl -sS -X PATCH \
             -H "Authorization: token ${GH_TOKEN}" \
             -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${repo}/issues/comments/${existing_comment_id}" \
-            -d "$(jq -n --arg body "${comment_body}" '{body: $body}')")
+            "https://api.github.com/repos/${repo}/issues/comments/${existing_id}" \
+            -d "$json_payload" >/dev/null
+          echo "Updated plan comment ${existing_id}"
         else
-          # Create new comment.
-          echo "Creating new comment..." >&2
-          response=$(curl -sS -w "\n%{http_code}" -X POST \
+          curl -sS -X POST \
             -H "Authorization: token ${GH_TOKEN}" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/${repo}/issues/${issue_id}/comments" \
-            -d "$(jq -n --arg body "${comment_body}" '{body: $body}')")
+            -d "$json_payload" >/dev/null
+          echo "Created plan comment"
         fi
 
-        http_code=$(echo "$response" | tail -1)
-        if [ "$http_code" -ge 400 ]; then
-          echo "Failed to post comment (HTTP ${http_code}):" >&2
-          echo "$response" | sed '$d' >&2
-          exit 1
-        fi
+        # Add label
+        curl -sS -X POST \
+          -H "Authorization: token ${GH_TOKEN}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          "https://api.github.com/repos/${repo}/issues/${issue_id}/labels" \
+          -d '{"labels":["ark:planning:in-progress"]}' >/dev/null 2>&1 || true
 
-        echo "Comment posted to issue #${issue_id}"
+        echo "Plan submitted for issue #${issue_id}"
 
   - name: summarize
     metadata:
@@ -430,16 +556,21 @@ spec:
           echo "Repository: <a href=\"https://github.com/${repo}\">${repo}</a></p>"
           echo "<h2>Analyzed Issues</h2>"
           echo "<table border=\"1\" cellpadding=\"8\" cellspacing=\"0\">"
-          echo "<tr><th>Issue</th><th>Title</th><th>Analysis</th></tr>"
+          echo "<tr><th>Issue</th><th>Title</th><th>Analysis</th><th>Plan</th></tr>"
         } > "${summary_html}"
 
         jq -r '.[] | "\(.number)|\(.title)|\(.url)"' "${issues_json}" | while IFS='|' read -r number title url; do
           if [ -f "${workspace_path}/${number}/analysis.md" ]; then
-            analysis_cell="Available"
+            analysis_cell="✓"
           else
             analysis_cell="-"
           fi
-          echo "<tr><td><a href=\"${url}\">#${number}</a></td><td>${title}</td><td>${analysis_cell}</td></tr>" >> "${summary_html}"
+          if [ -f "${workspace_path}/${number}/plan.md" ]; then
+            plan_cell="✓"
+          else
+            plan_cell="-"
+          fi
+          echo "<tr><td><a href=\"${url}\">#${number}</a></td><td>${title}</td><td>${analysis_cell}</td><td>${plan_cell}</td></tr>" >> "${summary_html}"
         done
 
         echo "</table>" >> "${summary_html}"
@@ -486,4 +617,31 @@ spec:
   - name: github-list-commits
     type: custom
   - name: github-get-commit
+    type: custom
+---
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: Agent
+metadata:
+  name: planner-agent
+spec:
+  modelRef:
+    name: default
+
+  prompt: |
+    You are a technical planner. Given an issue analysis, create detailed implementation plans.
+
+    Your plans should be:
+    - Specific and actionable
+    - Include file paths and function names where possible
+    - Have clear acceptance criteria
+    - Be implementable by a developer unfamiliar with the codebase
+
+  tools:
+  - name: github-issue-read
+    type: custom
+  - name: github-get-file-contents
+    type: custom
+  - name: github-search-code
+    type: custom
+  - name: github-list-branches
     type: custom

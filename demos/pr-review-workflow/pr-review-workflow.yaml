@@ -39,6 +39,10 @@ spec:
       value: ""
       description: "Comma-separated PR IDs to review (e.g., 234,56,2). If empty, uses all open PRs matching filters."
 
+    - name: label-filter
+      value: ""
+      description: "Only include PRs with this label (e.g., 'bug'). Empty means all PRs."
+
     - name: gh-token
       value: ""
       description: "GitHub token for API access. If provided, enables PR commenting and status updates."
@@ -124,10 +128,34 @@ spec:
           exit 1
         fi
 
+        # Validate GitHub token if provided
+        gh_user=""
+        gh_scopes=""
+        gh_token_type=""
+        if [ -n "${gh_token}" ]; then
+          token_response=$(curl -sS -D - -o /tmp/user.json \
+            -H "Authorization: token ${gh_token}" \
+            "https://api.github.com/user" 2>/dev/null)
+          http_code=$(echo "$token_response" | grep -i "^HTTP" | tail -1 | awk '{print $2}')
+          if [ "$http_code" = "200" ]; then
+            gh_user=$(jq -r '.login // empty' /tmp/user.json)
+            gh_scopes=$(echo "$token_response" | grep -i "^x-oauth-scopes:" | cut -d: -f2- | tr -d '\r' | xargs)
+            if [ -n "$gh_scopes" ]; then
+              gh_token_type="classic"
+            else
+              gh_token_type="⚠️ fine-grained (scopes not available)"
+            fi
+          else
+            gh_user="validation failed (HTTP ${http_code})"
+            gh_token_type="unknown"
+          fi
+        fi
+
         # Fetch PRs
         repo="{{workflow.parameters.github-repo}}"
         pr_ids_param="{{workflow.parameters.pr-ids}}"
         updated_since="{{workflow.parameters.updated-since}}"
+        label_filter="{{workflow.parameters.label-filter}}"
         workflow_id="{{workflow.name}}"
         workspace_path="/workspace/${workflow_id}"
         mkdir -p "${workspace_path}"
@@ -141,7 +169,7 @@ spec:
             http_code=$(echo "$response" | tail -1)
             body=$(echo "$response" | sed '$d')
             if [ "$http_code" = "200" ]; then
-              echo "$body" | jq '{number: .number, title: .title, url: .html_url}' > /tmp/pr.json
+              echo "$body" | jq '{number: .number, title: .title, url: .html_url, labels: [.labels[].name]}' > /tmp/pr.json
               jq -s '.[0] + [.[1]]' "${prs_json}" /tmp/pr.json > /tmp/merged.json
               mv /tmp/merged.json "${prs_json}"
             else
@@ -151,17 +179,12 @@ spec:
         else
           curl -sS \
             "https://api.github.com/repos/${repo}/pulls?state=open&per_page=100" \
-            | jq --arg since "${updated_since}" \
-              '[.[] | select(.updated_at > $since) | {number: .number, title: .title, url: .html_url}]' \
+            | jq --arg since "${updated_since}" --arg label "${label_filter}" \
+              '[.[] | select(.updated_at > $since) | select($label == "" or (.labels | map(.name) | contains([$label]))) | {number: .number, title: .title, url: .html_url, labels: [.labels[].name]}]' \
             > "${prs_json}"
         fi
 
         # Generate workflow plan
-        if [ -n "$gh_token" ]; then
-          gh_token_display="$(printf '%*s' $((${#gh_token} - 3)) '' | tr ' ' '*')${gh_token: -3}"
-        else
-          gh_token_display="not provided"
-        fi
         pr_count=$(jq 'length' "${prs_json}")
 
         cat > /tmp/workflow-plan.md <<EOF
@@ -171,7 +194,10 @@ spec:
         - **Repository:** ${repo}
         - **Agent:** ${agent_name}
         - **Updated Since:** ${updated_since}
-        - **GitHub Token:** ${gh_token_display}
+        - **Label Filter:** ${label_filter:-all}
+        - **GitHub Token User:** ${gh_user:-not provided}
+        - **GitHub Token Type:** ${gh_token_type:-⚠️ n/a}
+        - **GitHub Token Scopes:** ${gh_scopes:-⚠️ n/a}
         - **Comment on PR:** ${comment_on_pr}
 
         ## Pull Requests to Review (${pr_count})
@@ -255,6 +281,7 @@ spec:
           echo "Attempt ${attempt}/${max_retries} for PR #${pr_id}" >&2
 
           # Create Query to review PR.
+          # TODO
           kubectl create -f - <<EOF >&2
         apiVersion: ark.mckinsey.com/v1alpha1
         kind: Query

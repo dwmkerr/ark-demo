@@ -3,3 +3,4 @@ chart/charts/
 chart/Chart.lock
 .DS_Store
 *.devspace/
+.env
