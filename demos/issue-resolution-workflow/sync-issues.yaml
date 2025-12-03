@@ -223,19 +223,33 @@ spec:
 
           # Check if already synced (use 0 if search fails)
           search_query="repo:${target_repo} is:issue in:body ${url}"
-          existing=$(curl -sS -H "Authorization: token ${GH_TOKEN}" \
-            "https://api.github.com/search/issues?q=$(echo "$search_query" | jq -sRr @uri)" \
-            | jq '.total_count // 0')
+          search_response=$(curl -sS -H "Authorization: token ${GH_TOKEN}" \
+            "https://api.github.com/search/issues?q=$(echo "$search_query" | jq -sRr @uri)")
+          existing=$(echo "$search_response" | jq '.total_count // 0')
           existing=${existing:-0}
 
-          if [ "$existing" -gt 0 ] 2>/dev/null; then
-            echo "Skip #${number} (exists)"
-            echo "{\"source\":${number},\"target\":null,\"status\":\"skipped\"}" >> /tmp/results.json
-          else
-            # Create issue with link to original
-            new_body=$(printf "> **Original:** [%s#%s](%s)\n\n%s" "${source_repo}" "${number}" "${url}" "${body}")
-            jq -n --arg title "$title" --arg body "$new_body" '{title: $title, body: $body}' > /tmp/new-issue.json
+          # Build issue body with link to original
+          new_body=$(printf "> **Original:** [%s#%s](%s)\n\n%s" "${source_repo}" "${number}" "${url}" "${body}")
+          jq -n --arg title "$title" --arg body "$new_body" '{title: $title, body: $body}' > /tmp/new-issue.json
 
+          if [ "$existing" -gt 0 ] 2>/dev/null; then
+            # Update existing issue
+            existing_number=$(echo "$search_response" | jq -r '.items[0].number')
+            response=$(curl -sS -X PATCH \
+              -H "Authorization: token ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${target_repo}/issues/${existing_number}" \
+              -d @/tmp/new-issue.json)
+            error_msg=$(echo "$response" | jq -r '.message // empty')
+            if [ -z "$error_msg" ]; then
+              echo "Updated #${number} -> #${existing_number}"
+              echo "{\"source\":${number},\"target\":${existing_number},\"status\":\"updated\"}" >> /tmp/results.json
+            else
+              echo "Failed update #${number}: ${error_msg}"
+              echo "{\"source\":${number},\"target\":null,\"status\":\"failed\"}" >> /tmp/results.json
+            fi
+          else
+            # Create new issue
             response=$(curl -sS -X POST \
               -H "Authorization: token ${GH_TOKEN}" \
               -H "Accept: application/vnd.github.v3+json" \
