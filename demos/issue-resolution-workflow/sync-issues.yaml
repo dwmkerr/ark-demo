@@ -83,10 +83,11 @@ spec:
         echo "[]" > /tmp/issues.json
         echo "[]" > /tmp/sync-plan.json
 
-        # Fetch issues from source (no auth needed for public repos)
+        # Fetch issues from source
         if [ -n "$issue_ids" ]; then
           for id in $(echo "$issue_ids" | tr ',' ' '); do
             response=$(curl -sS -w "\n%{http_code}" \
+              -H "Authorization: token ${GH_TOKEN}" \
               "https://api.github.com/repos/${source_repo}/issues/${id}")
             http_code=$(echo "$response" | tail -1)
             body=$(echo "$response" | sed '$d')
@@ -101,7 +102,7 @@ spec:
         else
           api_url="https://api.github.com/repos/${source_repo}/issues?state=open&per_page=100"
           [ -n "$label_filter" ] && api_url="${api_url}&labels=${label_filter}"
-          curl -sS "$api_url" \
+          curl -sS -H "Authorization: token ${GH_TOKEN}" "$api_url" \
             | jq '[.[] | select(.pull_request == null)]' > /tmp/issues.json
         fi
 
@@ -193,10 +194,11 @@ spec:
         echo "[]" > /tmp/issues.json
         echo "[]" > /tmp/sync-result.json
 
-        # Fetch issues (no auth needed for public repos)
+        # Fetch issues
         if [ -n "$issue_ids" ]; then
           for id in $(echo "$issue_ids" | tr ',' ' '); do
             response=$(curl -sS -w "\n%{http_code}" \
+              -H "Authorization: token ${GH_TOKEN}" \
               "https://api.github.com/repos/${source_repo}/issues/${id}")
             http_code=$(echo "$response" | tail -1)
             body=$(echo "$response" | sed '$d')
@@ -209,84 +211,93 @@ spec:
         else
           api_url="https://api.github.com/repos/${source_repo}/issues?state=open&per_page=100"
           [ -n "$label_filter" ] && api_url="${api_url}&labels=${label_filter}"
-          curl -sS "$api_url" \
+          curl -sS -H "Authorization: token ${GH_TOKEN}" "$api_url" \
             | jq '[.[] | select(.pull_request == null)]' > /tmp/issues.json
         fi
 
-        # Sync each issue (sleep to avoid rate limits)
-        jq -c '.[]' /tmp/issues.json | while read -r issue; do
+        # Sync each issue
+        failed=0
+        issue_count=$(jq 'length' /tmp/issues.json)
+        i=0
+        while [ "$i" -lt "$issue_count" ]; do
           sleep 2
-          number=$(echo "$issue" | jq -r '.number')
-          title=$(echo "$issue" | jq -r '.title')
-          body=$(echo "$issue" | jq -r '.body // ""')
-          url=$(echo "$issue" | jq -r '.html_url')
-
-          # Check if already synced (use 0 if search fails)
-          search_query="repo:${target_repo} is:issue in:body ${url}"
-          search_response=$(curl -sS -H "Authorization: token ${GH_TOKEN}" \
-            "https://api.github.com/search/issues?q=$(echo "$search_query" | jq -sRr @uri)")
-          existing=$(echo "$search_response" | jq '.total_count // 0')
-          existing=${existing:-0}
+          number=$(jq -r ".[$i].number" /tmp/issues.json)
+          title=$(jq -r ".[$i].title" /tmp/issues.json)
+          body=$(jq -r ".[$i].body // \"\"" /tmp/issues.json)
+          url=$(jq -r ".[$i].html_url" /tmp/issues.json)
 
           # Build issue body with link to original
           new_body=$(printf "> **Original:** [%s#%s](%s)\n\n%s" "${source_repo}" "${number}" "${url}" "${body}")
           jq -n --arg title "$title" --arg body "$new_body" '{title: $title, body: $body}' > /tmp/new-issue.json
 
-          if [ "$existing" -gt 0 ] 2>/dev/null; then
-            # Update existing issue
-            existing_number=$(echo "$search_response" | jq -r '.items[0].number')
-            response=$(curl -sS -X PATCH \
-              -H "Authorization: token ${GH_TOKEN}" \
-              -H "Accept: application/vnd.github.v3+json" \
-              "https://api.github.com/repos/${target_repo}/issues/${existing_number}" \
-              -d @/tmp/new-issue.json)
-            error_msg=$(echo "$response" | jq -r '.message // empty')
-            if [ -z "$error_msg" ]; then
-              echo "Updated #${number} -> #${existing_number}"
-              echo "{\"source\":${number},\"target\":${existing_number},\"status\":\"updated\"}" >> /tmp/results.json
-            else
-              echo "Failed update #${number}: ${error_msg}"
-              echo "{\"source\":${number},\"target\":null,\"status\":\"failed\"}" >> /tmp/results.json
-            fi
-          else
-            # Create new issue
-            response=$(curl -sS -X POST \
+          # Create issue with retry on rate limit (5 min intervals, up to 24 hours = 288 retries)
+          max_retries=288
+          retry=0
+          success=false
+          while [ "$retry" -lt "$max_retries" ] && [ "$success" = "false" ]; do
+            http_response=$(curl -sS -w "\n%{http_code}" -X POST \
               -H "Authorization: token ${GH_TOKEN}" \
               -H "Accept: application/vnd.github.v3+json" \
               "https://api.github.com/repos/${target_repo}/issues" \
               -d @/tmp/new-issue.json)
+            http_code=$(echo "$http_response" | tail -1)
+            response_body=$(echo "$http_response" | sed '$d')
 
-            new_number=$(echo "$response" | jq -r '.number')
-            error_msg=$(echo "$response" | jq -r '.message // empty')
-
-            if [ "$new_number" != "null" ] && [ -n "$new_number" ]; then
-              # Add label
-              curl -sS -X POST \
-                -H "Authorization: token ${GH_TOKEN}" \
-                "https://api.github.com/repos/${target_repo}/issues/${new_number}/labels" \
-                -d "{\"labels\":[\"${sync_label}\"]}" >/dev/null 2>&1 || true
-
-              echo "Synced #${number} -> #${new_number}"
-              echo "{\"source\":${number},\"target\":${new_number},\"status\":\"synced\"}" >> /tmp/results.json
+            if [ "$http_code" = "201" ]; then
+              success=true
+            elif [ "$http_code" = "403" ]; then
+              retry=$((retry + 1))
+              echo "Rate limited on #${number}, retry ${retry}/${max_retries} in 5 min..."
+              sleep 300
             else
-              echo "Failed #${number}: ${error_msg}"
-              echo "{\"source\":${number},\"target\":null,\"status\":\"failed\"}" >> /tmp/results.json
+              break
             fi
+          done
+
+          new_number=$(echo "$response_body" | jq -r '.number // empty')
+          error_msg=$(echo "$response_body" | jq -r '.message // empty')
+          target_url="https://github.com/${target_repo}/issues/${new_number}"
+
+          if [ "$http_code" = "201" ] && [ -n "$new_number" ]; then
+            # Add label (ignore errors)
+            curl -sS -X POST \
+              -H "Authorization: token ${GH_TOKEN}" \
+              "https://api.github.com/repos/${target_repo}/issues/${new_number}/labels" \
+              -d "{\"labels\":[\"${sync_label}\"]}" >/dev/null 2>&1 || true
+
+            echo "Synced #${number} -> #${new_number}"
+            echo "{\"source_number\":${number},\"source_url\":\"${url}\",\"target_number\":${new_number},\"target_url\":\"${target_url}\",\"status\":\"synced\"}" >> /tmp/results.json
+          else
+            echo "FAILED #${number} (HTTP ${http_code}): ${error_msg}"
+            echo "{\"source_number\":${number},\"source_url\":\"${url}\",\"target_number\":null,\"target_url\":null,\"status\":\"failed\",\"error\":\"${error_msg}\"}" >> /tmp/results.json
+            failed=$((failed + 1))
           fi
+          i=$((i + 1))
         done
 
         # Build final result
         if [ -f /tmp/results.json ]; then
           jq -s '.' /tmp/results.json > /tmp/sync-result.json
+        else
+          echo "[]" > /tmp/sync-result.json
         fi
 
         echo ""
         echo "## Results"
-        jq -r '.[] | "Source #\(.source) -> Target #\(.target // "n/a") (\(.status))"' /tmp/sync-result.json
+        echo ""
+        echo "| Source | Target | Status |"
+        echo "|--------|--------|--------|"
+        jq -r '.[] | "| [#\(.source_number)](\(.source_url)) | \(if .target_number then "[#\(.target_number)](\(.target_url))" else "-" end) | \(.status) |"' /tmp/sync-result.json
 
         synced=$(jq '[.[] | select(.status == "synced")] | length' /tmp/sync-result.json)
         echo ""
-        echo "**Synced:** ${synced}"
+        echo "**Synced:** ${synced} | **Failed:** ${failed}"
+
+        # Fail step if any failed
+        if [ "$failed" -gt 0 ]; then
+          echo "ERROR: ${failed} issues failed to sync"
+          exit 1
+        fi
     outputs:
       artifacts:
       - name: sync-result
