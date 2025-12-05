@@ -1,0 +1,306 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: sync-issues
+  annotations:
+    workflows.argoproj.io/title: "Sync Issues"
+    workflows.argoproj.io/description: |
+      Copies issues from a source repo to a target (working) repo.
+
+      Synced issues link back to the original and are labeled for tracking.
+      Idempotent - skips issues already synced.
+spec:
+  entrypoint: main
+  serviceAccountName: argo-workflow
+
+  arguments:
+    parameters:
+    - name: source-repo
+      value: "mckinsey/agents-at-scale-ark"
+      description: "Source repository to copy issues from"
+
+    - name: target-repo
+      value: "dwmkerr/agents-at-scale-ark"
+      description: "Target repository to copy issues to"
+
+    - name: issue-ids
+      value: ""
+      description: "Comma-separated issue IDs to sync (empty = all open issues)"
+
+    - name: label-filter
+      value: ""
+      description: "Only sync issues with this label"
+
+    - name: sync-label
+      value: "ark:synced"
+      description: "Label to add to synced issues in target repo"
+
+    - name: gh-token
+      value: ""
+      description: "GitHub token with repo access"
+
+  templates:
+  - name: main
+    dag:
+      tasks:
+      - name: prepare
+        template: prepare
+
+      - name: request-approval
+        template: request-approval
+        depends: "prepare"
+        arguments:
+          artifacts:
+          - name: sync-plan
+            from: "{{tasks.prepare.outputs.artifacts.sync-plan}}"
+
+      - name: sync
+        template: sync
+        depends: "request-approval"
+
+  - name: prepare
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Fetch issues and prepare sync plan"
+    script:
+      image: badouralix/curl-jq:latest
+      command: [sh]
+      env:
+      - name: GH_TOKEN
+        value: "{{workflow.parameters.gh-token}}"
+      source: |
+        set -e -o pipefail
+
+        source_repo="{{workflow.parameters.source-repo}}"
+        target_repo="{{workflow.parameters.target-repo}}"
+        issue_ids="{{workflow.parameters.issue-ids}}"
+        label_filter="{{workflow.parameters.label-filter}}"
+
+        echo "Preparing sync from ${source_repo} to ${target_repo}"
+        echo ""
+
+        # Initialize
+        echo "[]" > /tmp/issues.json
+        echo "[]" > /tmp/sync-plan.json
+
+        # Fetch issues from source
+        if [ -n "$issue_ids" ]; then
+          for id in $(echo "$issue_ids" | tr ',' ' '); do
+            response=$(curl -sS -w "\n%{http_code}" \
+              -H "Authorization: token ${GH_TOKEN}" \
+              "https://api.github.com/repos/${source_repo}/issues/${id}")
+            http_code=$(echo "$response" | tail -1)
+            body=$(echo "$response" | sed '$d')
+            if [ "$http_code" = "200" ]; then
+              echo "$body" > /tmp/issue.json
+              jq -s '.[0] + [.[1]]' /tmp/issues.json /tmp/issue.json > /tmp/issues-new.json
+              mv /tmp/issues-new.json /tmp/issues.json
+            else
+              echo "Warning: Issue #${id} not found (HTTP ${http_code})" >&2
+            fi
+          done
+        else
+          api_url="https://api.github.com/repos/${source_repo}/issues?state=open&per_page=100"
+          [ -n "$label_filter" ] && api_url="${api_url}&labels=${label_filter}"
+          curl -sS -H "Authorization: token ${GH_TOKEN}" "$api_url" \
+            | jq '[.[] | select(.pull_request == null)]' > /tmp/issues.json
+        fi
+
+        issue_count=$(jq 'length' /tmp/issues.json)
+        echo "Found ${issue_count} issues to sync"
+
+        # Build sync plan (sleep to avoid rate limits)
+        jq -c '.[]' /tmp/issues.json | while read -r issue; do
+          sleep 2
+          number=$(echo "$issue" | jq -r '.number')
+          title=$(echo "$issue" | jq -r '.title')
+          url=$(echo "$issue" | jq -r '.html_url')
+
+          # Check if already synced (use 0 if search fails)
+          search_query="repo:${target_repo} is:issue in:body ${url}"
+          existing=$(curl -sS -H "Authorization: token ${GH_TOKEN}" \
+            "https://api.github.com/search/issues?q=$(echo "$search_query" | jq -sRr @uri)" \
+            | jq '.total_count // 0')
+          existing=${existing:-0}
+
+          if [ "$existing" -gt 0 ] 2>/dev/null; then
+            status="skip"
+          else
+            status="pending"
+          fi
+
+          echo "{\"source_number\":${number},\"source_url\":\"${url}\",\"title\":$(echo "$title" | jq -R .),\"status\":\"${status}\"}" >> /tmp/plan-items.json
+        done
+
+        # Combine into array
+        if [ -f /tmp/plan-items.json ]; then
+          jq -s '.' /tmp/plan-items.json > /tmp/sync-plan.json
+        fi
+
+        # Display plan
+        echo "## Sync Plan"
+        echo ""
+        echo "| Source | Title | Status |"
+        echo "|--------|-------|--------|"
+        jq -r '.[] | "| #\(.source_number) | \(.title[0:50]) | \(.status) |"' /tmp/sync-plan.json
+
+        pending=$(jq '[.[] | select(.status == "pending")] | length' /tmp/sync-plan.json)
+        skip=$(jq '[.[] | select(.status == "skip")] | length' /tmp/sync-plan.json)
+        echo ""
+        echo "**Pending:** ${pending} | **Skip:** ${skip}"
+    outputs:
+      artifacts:
+      - name: sync-plan
+        path: /tmp/sync-plan.json
+        archive:
+          none: {}
+
+  - name: request-approval
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: |
+          Review the sync plan before proceeding.
+
+          To approve: argo resume {{workflow.name}}
+          To reject: argo terminate {{workflow.name}}
+    inputs:
+      artifacts:
+      - name: sync-plan
+    suspend: {}
+
+  - name: sync
+    metadata:
+      annotations:
+        workflows.argoproj.io/description: "Sync issues to target repo"
+    script:
+      image: badouralix/curl-jq:latest
+      command: [sh]
+      env:
+      - name: GH_TOKEN
+        value: "{{workflow.parameters.gh-token}}"
+      source: |
+        set -e -o pipefail
+
+        source_repo="{{workflow.parameters.source-repo}}"
+        target_repo="{{workflow.parameters.target-repo}}"
+        sync_label="{{workflow.parameters.sync-label}}"
+        issue_ids="{{workflow.parameters.issue-ids}}"
+        label_filter="{{workflow.parameters.label-filter}}"
+
+        echo "Syncing issues to ${target_repo}"
+        echo ""
+
+        # Initialize
+        echo "[]" > /tmp/issues.json
+        echo "[]" > /tmp/sync-result.json
+
+        # Fetch issues
+        if [ -n "$issue_ids" ]; then
+          for id in $(echo "$issue_ids" | tr ',' ' '); do
+            response=$(curl -sS -w "\n%{http_code}" \
+              -H "Authorization: token ${GH_TOKEN}" \
+              "https://api.github.com/repos/${source_repo}/issues/${id}")
+            http_code=$(echo "$response" | tail -1)
+            body=$(echo "$response" | sed '$d')
+            if [ "$http_code" = "200" ]; then
+              echo "$body" > /tmp/issue.json
+              jq -s '.[0] + [.[1]]' /tmp/issues.json /tmp/issue.json > /tmp/issues-new.json
+              mv /tmp/issues-new.json /tmp/issues.json
+            fi
+          done
+        else
+          api_url="https://api.github.com/repos/${source_repo}/issues?state=open&per_page=100"
+          [ -n "$label_filter" ] && api_url="${api_url}&labels=${label_filter}"
+          curl -sS -H "Authorization: token ${GH_TOKEN}" "$api_url" \
+            | jq '[.[] | select(.pull_request == null)]' > /tmp/issues.json
+        fi
+
+        # Sync each issue
+        failed=0
+        issue_count=$(jq 'length' /tmp/issues.json)
+        i=0
+        while [ "$i" -lt "$issue_count" ]; do
+          sleep 2
+          number=$(jq -r ".[$i].number" /tmp/issues.json)
+          title=$(jq -r ".[$i].title" /tmp/issues.json)
+          body=$(jq -r ".[$i].body // \"\"" /tmp/issues.json)
+          url=$(jq -r ".[$i].html_url" /tmp/issues.json)
+
+          # Build issue body with link to original
+          new_body=$(printf "> **Original:** [%s#%s](%s)\n\n%s" "${source_repo}" "${number}" "${url}" "${body}")
+          jq -n --arg title "$title" --arg body "$new_body" '{title: $title, body: $body}' > /tmp/new-issue.json
+
+          # Create issue with retry on rate limit (5 min intervals, up to 24 hours = 288 retries)
+          max_retries=288
+          retry=0
+          success=false
+          while [ "$retry" -lt "$max_retries" ] && [ "$success" = "false" ]; do
+            http_response=$(curl -sS -w "\n%{http_code}" -X POST \
+              -H "Authorization: token ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${target_repo}/issues" \
+              -d @/tmp/new-issue.json)
+            http_code=$(echo "$http_response" | tail -1)
+            response_body=$(echo "$http_response" | sed '$d')
+
+            if [ "$http_code" = "201" ]; then
+              success=true
+            elif [ "$http_code" = "403" ]; then
+              retry=$((retry + 1))
+              echo "Rate limited on #${number}, retry ${retry}/${max_retries} in 5 min..."
+              sleep 300
+            else
+              break
+            fi
+          done
+
+          new_number=$(echo "$response_body" | jq -r '.number // empty')
+          error_msg=$(echo "$response_body" | jq -r '.message // empty')
+          target_url="https://github.com/${target_repo}/issues/${new_number}"
+
+          if [ "$http_code" = "201" ] && [ -n "$new_number" ]; then
+            # Add label (ignore errors)
+            curl -sS -X POST \
+              -H "Authorization: token ${GH_TOKEN}" \
+              "https://api.github.com/repos/${target_repo}/issues/${new_number}/labels" \
+              -d "{\"labels\":[\"${sync_label}\"]}" >/dev/null 2>&1 || true
+
+            echo "Synced #${number} -> #${new_number}"
+            echo "{\"source_number\":${number},\"source_url\":\"${url}\",\"target_number\":${new_number},\"target_url\":\"${target_url}\",\"status\":\"synced\"}" >> /tmp/results.json
+          else
+            echo "FAILED #${number} (HTTP ${http_code}): ${error_msg}"
+            echo "{\"source_number\":${number},\"source_url\":\"${url}\",\"target_number\":null,\"target_url\":null,\"status\":\"failed\",\"error\":\"${error_msg}\"}" >> /tmp/results.json
+            failed=$((failed + 1))
+          fi
+          i=$((i + 1))
+        done
+
+        # Build final result
+        if [ -f /tmp/results.json ]; then
+          jq -s '.' /tmp/results.json > /tmp/sync-result.json
+        else
+          echo "[]" > /tmp/sync-result.json
+        fi
+
+        echo ""
+        echo "## Results"
+        echo ""
+        echo "| Source | Target | Status |"
+        echo "|--------|--------|--------|"
+        jq -r '.[] | "| [#\(.source_number)](\(.source_url)) | \(if .target_number then "[#\(.target_number)](\(.target_url))" else "-" end) | \(.status) |"' /tmp/sync-result.json
+
+        synced=$(jq '[.[] | select(.status == "synced")] | length' /tmp/sync-result.json)
+        echo ""
+        echo "**Synced:** ${synced} | **Failed:** ${failed}"
+
+        # Fail step if any failed
+        if [ "$failed" -gt 0 ]; then
+          echo "ERROR: ${failed} issues failed to sync"
+          exit 1
+        fi
+    outputs:
+      artifacts:
+      - name: sync-result
+        path: /tmp/sync-result.json
+        archive:
+          none: {}
