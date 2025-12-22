@@ -66,6 +66,10 @@ mcpServers:
     enabled: true
     githubToken: ""  # REQUIRED: Set your GitHub token (ghp_...)
 
+  # Shellwright MCP server - terminal automation, screenshots, GIF recording
+  shellwright:
+    enabled: true
+
   # AI Developer Guide MCP server
   aiDeveloperGuide:
     enabled: true
