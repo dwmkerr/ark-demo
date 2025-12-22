@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.1.7](https://github.com/dwmkerr/ark-demo/compare/v0.1.6...v0.1.7) (2025-12-22)
+
+
+### Features
+
+* add AWS Knowledge and Microsoft Learn MCP servers ([#23](https://github.com/dwmkerr/ark-demo/issues/23)) ([b1ab9aa](https://github.com/dwmkerr/ark-demo/commit/b1ab9aa1f0716ea436ccc7e8af4cc1612bb57786))
+* add issue resolution workflow demo ([#24](https://github.com/dwmkerr/ark-demo/issues/24)) ([774e058](https://github.com/dwmkerr/ark-demo/commit/774e058236d808e58a3aa4ed5f214ddfdaf6b2a1))
+* add planning step and token validation to workflows ([#26](https://github.com/dwmkerr/ark-demo/issues/26)) ([ea99c95](https://github.com/dwmkerr/ark-demo/commit/ea99c956793fd4128a7fe6aeadd6005327fdda5b))
+* add sync-issues workflow for copying issues to working repo ([#27](https://github.com/dwmkerr/ark-demo/issues/27)) ([b4c8e2c](https://github.com/dwmkerr/ark-demo/commit/b4c8e2c25727c860809ca15e6f83559fc3a0443c))
+* align demos with ARK patterns ([#20](https://github.com/dwmkerr/ark-demo/issues/20)) ([7d0895c](https://github.com/dwmkerr/ark-demo/commit/7d0895cc7a8d28ba7ca3c1f80607516572ba0566))
+
+
+### Bug Fixes
+
+* add MCP server path for Ark v0.1.49 compatibility ([#28](https://github.com/dwmkerr/ark-demo/issues/28)) ([ec87d49](https://github.com/dwmkerr/ark-demo/commit/ec87d493a908a0af3e5aaaf33aba1547048956c5))
+* resolve merge conflict - keep dwmkerr-ark-demo as release name ([2e8517e](https://github.com/dwmkerr/ark-demo/commit/2e8517e2676de31d84f541a900e8d388a7799d38))
+* use dwmkerr-ark-demo as helm release name in Makefile ([0705f71](https://github.com/dwmkerr/ark-demo/commit/0705f713548c46140ac5b19714a96f660a4fec5f))
+
 ## [0.1.6](https://github.com/dwmkerr/ark-demo/compare/v0.1.5...v0.1.6) (2025-10-29)
 
 
