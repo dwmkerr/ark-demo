@@ -64,7 +64,6 @@ mcpServers:
   # GitHub MCP server - provides GitHub integration
   github:
     enabled: true
-    githubToken: ""  # REQUIRED: Set your GitHub token (ghp_...)
 
   # Shellwright MCP server - terminal automation, screenshots, GIF recording
   shellwright:
@@ -86,3 +85,7 @@ mcpServers:
 ai-developer-guide-mcp:
   mcpServer:
     create: true
+
+github-mcp:
+  github:
+    token: ""  # REQUIRED: Set your GitHub token with Bearer prefix (Bearer ghp_...)

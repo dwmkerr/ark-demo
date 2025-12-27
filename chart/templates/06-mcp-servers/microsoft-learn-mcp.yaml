@@ -9,6 +9,8 @@ spec:
   address:
     value: "https://learn.microsoft.com/api/mcp"
   timeout: "30s"
+  # Reduce health check frequency to avoid rate limiting
+  pollInterval: "5m"
   transport: http
   description: "Microsoft Learn MCP server"
 {{- end }}
