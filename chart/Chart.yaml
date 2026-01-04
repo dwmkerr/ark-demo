@@ -8,7 +8,7 @@ annotations:
   ark.mckinsey.com/service: ark-demo
 dependencies:
   - name: ai-developer-guide-mcp
-    version: '>=0.1.0'
+    version: '>=0.1.21'
     repository: oci://ghcr.io/dwmkerr/charts
     condition: mcpServers.aiDeveloperGuide.enabled
   - name: shell-mcp
@@ -19,3 +19,7 @@ dependencies:
     version: '>=0.1.0'
     repository: oci://ghcr.io/dwmkerr/charts
     condition: mcpServers.github.enabled
+  - name: shellwright
+    version: '>=0.1.0'
+    repository: oci://ghcr.io/dwmkerr/charts
+    condition: mcpServers.shellwright.enabled
