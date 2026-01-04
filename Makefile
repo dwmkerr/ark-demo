@@ -17,8 +17,7 @@ install: # install the dwmkerr starter kit models to the cluster using Helm
 	helm upgrade --install $(CHART_NAME) $(CHART_PATH) \
 		--values custom-values.yaml \
 		--create-namespace \
-		--namespace $(NAMESPACE) \
-		--wait
+		--namespace $(NAMESPACE)
 
 .PHONY: install-all
 install-all: install # install all resources including internal tools
