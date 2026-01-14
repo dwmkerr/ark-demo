@@ -11,7 +11,7 @@ metadata:
   annotations:
     ark.mckinsey.com/dashboard-icon: "/icons/claude.png"
 spec:
-  type: openai
+  provider: openai
   model:
     value: {{ .model }}
   # Regular refresh interval for model availability checks
@@ -40,7 +40,7 @@ metadata:
   annotations:
     ark.mckinsey.com/dashboard-icon: "/icons/gemini.png"
 spec:
-  type: openai
+  provider: openai
   model:
     value: {{ .model }}
   # Regular refresh interval for model availability checks
@@ -69,7 +69,7 @@ metadata:
   annotations:
     ark.mckinsey.com/dashboard-icon: "/icons/azure.png"
 spec:
-  type: azure
+  provider: azure
   model:
     value: {{ .model }}
   # Regular refresh interval for model availability checks
@@ -100,7 +100,7 @@ metadata:
   annotations:
     ark.mckinsey.com/dashboard-icon: "/icons/openai-blue.png"
 spec:
-  type: openai
+  provider: openai
   model:
     value: {{ .model }}
   # Regular refresh interval for model availability checks
@@ -129,7 +129,7 @@ metadata:
   annotations:
     ark.mckinsey.com/dashboard-icon: "/icons/aws.png"
 spec:
-  type: bedrock
+  provider: bedrock
   model:
     value: {{ .model }}
   # Regular refresh interval for model availability checks
