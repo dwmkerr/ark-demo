@@ -1,6 +1,7 @@
 
 {{- if .Values.models.anthropic.enabled }}
 {{- range .Values.models.anthropic.models }}
+{{- if not (and (eq .name "default") $.Values.skipDefaultModel) }}
 ---
 apiVersion: ark.mckinsey.com/v1alpha1
 kind: Model
@@ -27,9 +28,11 @@ spec:
             key: apiKey
 {{- end }}
 {{- end }}
+{{- end }}
 
 {{- if .Values.models.gemini.enabled }}
 {{- range .Values.models.gemini.models }}
+{{- if not (and (eq .name "default") $.Values.skipDefaultModel) }}
 ---
 apiVersion: ark.mckinsey.com/v1alpha1
 kind: Model
@@ -56,9 +59,11 @@ spec:
             key: apiKey
 {{- end }}
 {{- end }}
+{{- end }}
 
 {{- if and .Values.models.azureOpenAI.enabled .Values.models.azureOpenAI.baseUrl }}
 {{- range .Values.models.azureOpenAI.models }}
+{{- if not (and (eq .name "default") $.Values.skipDefaultModel) }}
 ---
 apiVersion: ark.mckinsey.com/v1alpha1
 kind: Model
@@ -87,9 +92,11 @@ spec:
             key: apiKey
 {{- end }}
 {{- end }}
+{{- end }}
 
 {{- if .Values.models.openai.enabled }}
 {{- range .Values.models.openai.models }}
+{{- if not (and (eq .name "default") $.Values.skipDefaultModel) }}
 ---
 apiVersion: ark.mckinsey.com/v1alpha1
 kind: Model
@@ -116,9 +123,11 @@ spec:
             key: apiKey
 {{- end }}
 {{- end }}
+{{- end }}
 
 {{- if .Values.models.bedrock.enabled }}
 {{- range .Values.models.bedrock.models }}
+{{- if not (and (eq .name "default") $.Values.skipDefaultModel) }}
 ---
 apiVersion: ark.mckinsey.com/v1alpha1
 kind: Model
@@ -164,5 +173,6 @@ spec:
           value: {{ .temperature | quote }}
         max_tokens:
           value: {{ .maxTokens | quote }}
+{{- end }}
 {{- end }}
 {{- end }}
