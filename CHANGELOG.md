@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.8](https://github.com/dwmkerr/ark-demo/compare/v0.1.7...v0.1.8) (2026-02-25)
+
+
+### Features
+
+* add shellwright MCP server and path fix for Ark v0.1.49 ([#29](https://github.com/dwmkerr/ark-demo/issues/29)) ([817210a](https://github.com/dwmkerr/ark-demo/commit/817210ae92ea0d9a448086a28a2a455c29738cf1))
+* skip default model if it already exists in cluster ([#31](https://github.com/dwmkerr/ark-demo/issues/31)) ([1fb2eb5](https://github.com/dwmkerr/ark-demo/commit/1fb2eb565ff14dc864a8eeb7373add6d8fd255a3))
+
 ## [0.1.7](https://github.com/dwmkerr/ark-demo/compare/v0.1.6...v0.1.7) (2025-12-22)
 
 
