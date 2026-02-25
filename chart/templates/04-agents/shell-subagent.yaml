@@ -9,7 +9,7 @@ metadata:
 spec:
   description: Specialized shell operations agent that executes commands safely
   tools:
-  - type: custom
+  - type: mcp
     name: shell-mcp-execute-shell-command
   prompt: |
     You are a shell operations specialist. Your role is to execute shell commands safely and return results clearly.
