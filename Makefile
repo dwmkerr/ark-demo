@@ -7,7 +7,6 @@ help: # show help for each recipe
 CHART_NAME := dwmkerr-ark-demo
 CHART_PATH := ./chart
 NAMESPACE ?= default
-
 # Skip creating the 'default' model if one already exists in the cluster
 HELM_EXTRA_ARGS :=
 ifneq ($(shell kubectl get model default --no-headers 2>/dev/null),)
@@ -26,6 +25,15 @@ install: # install the dwmkerr starter kit models to the cluster using Helm
 		--namespace $(NAMESPACE) \
 		$(HELM_EXTRA_ARGS)
 	# Install useful shit from the marketplace.
+	# Requires ark CLI >= 0.1.55 for `marketplace/executors/...` support
+	# (`npm install -g @agents-at-scale/ark@latest`).
+	ark install marketplace/executors/executor-claude-agent-sdk
+	# TODO: switch back to `ark install marketplace/executors/executor-openai-responses`
+	# once both the chart AND image are published to ghcr.io (PR #179 merged the
+	# source but nothing's been pushed yet — 404 on the chart, denied on the image).
+	# For now: devspace builds the Dockerfile locally and helm-installs the chart
+	# with image overrides in one step (release name: executor-openai-responses).
+	(cd /Users/Dave_Kerr/repos/github/mckinsey/agents-at-scale-marketplace/main/executors/openai-responses && devspace deploy -n default)
 	ark install marketplace/agents/noah
 	ark install marketplace/services/a2a-inspector
 	ark install marketplace/services/ark-sandbox
@@ -57,3 +65,9 @@ status: # show deployment status
 template: # render chart templates to see what would be created
 	helm template $(CHART_NAME) $(CHART_PATH) \
 		--values custom-values.yaml
+
+.PHONY: upgrade-storage-backend-postgres
+upgrade-storage-backend-postgres: # switch the Ark controller storage backend to PostgreSQL
+	helm upgrade ark-controller oci://ghcr.io/mckinsey/agents-at-scale-ark/charts/ark-controller \
+		--namespace ark-system --reuse-values \
+		--set storage.backend=postgresql
