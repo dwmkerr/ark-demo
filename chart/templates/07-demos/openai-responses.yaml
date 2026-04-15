@@ -12,6 +12,7 @@ kind: Agent
 metadata:
   name: website-search-agent
   annotations:
+    ark.mckinsey.com/dashboard-icon: "/icons/openai-blue.png"
     executor-openai-responses.ark.mckinsey.com/reasoning: '{"effort": "low"}'
     executor-openai-responses.ark.mckinsey.com/tools: |
       [
@@ -51,6 +52,7 @@ kind: Agent
 metadata:
   name: company-lookup-agent
   annotations:
+    ark.mckinsey.com/dashboard-icon: "/icons/openai-blue.png"
     executor-openai-responses.ark.mckinsey.com/reasoning: '{"effort": "low"}'
     executor-openai-responses.ark.mckinsey.com/tools: |
       [
@@ -124,6 +126,7 @@ kind: Agent
 metadata:
   name: sql-generator-agent
   annotations:
+    ark.mckinsey.com/dashboard-icon: "/icons/openai-blue.png"
     executor-openai-responses.ark.mckinsey.com/reasoning: '{"effort": "low"}'
     executor-openai-responses.ark.mckinsey.com/tools: |
       [
@@ -165,6 +168,7 @@ kind: Agent
 metadata:
   name: dsl-generator-agent
   annotations:
+    ark.mckinsey.com/dashboard-icon: "/icons/openai-blue.png"
     executor-openai-responses.ark.mckinsey.com/reasoning: '{"effort": "low"}'
     executor-openai-responses.ark.mckinsey.com/tools: |
       [
@@ -212,6 +216,7 @@ kind: Agent
 metadata:
   name: companies-house-agent
   annotations:
+    ark.mckinsey.com/dashboard-icon: "/icons/openai-blue.png"
     executor-openai-responses.ark.mckinsey.com/reasoning: '{"effort": "low"}'
 spec:
   modelRef:
