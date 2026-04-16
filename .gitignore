@@ -5,3 +5,4 @@ chart/Chart.lock
 *.devspace/
 .env
 scratch/
+.playwright-mcp/

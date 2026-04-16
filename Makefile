@@ -35,6 +35,17 @@ install: # install the dwmkerr starter kit models to the cluster using Helm
 	ark install marketplace/services/file-gateway
 	ark install marketplace/services/mcp-inspector
 	ark install marketplace/services/phoenix
+	# Post-Phoenix tweaks for OTel tracing (drop once marketplace issue #233 is fixed):
+	#  1. Enable the OpenAI OTEL instrumentor on the Responses executor —
+	#     chart defaults OTEL_INSTRUMENTATION_ENABLED=false so OpenAI-layer
+	#     spans land in Phoenix with empty attributes. (Note: marketplace chart
+	#     sets a *different* flag, OTEL_INSTRUMENTATION_A2A_SDK_ENABLED, which
+	#     does NOT enable the OpenAI instrumentor.)
+	#  2. Restart claude-agent-sdk so `envFrom: otel-environment-variables`
+	#     re-reads the Secret Phoenix just created.
+	#     (setting env on openai-responses triggers its own rollout.)
+	kubectl set env deploy/executor-openai-responses OTEL_INSTRUMENTATION_ENABLED=true
+	kubectl rollout restart deploy/executor-claude-agent-sdk
 
 .PHONY: install-all
 install-all: install # install all resources including internal tools
