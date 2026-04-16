@@ -1,0 +1,126 @@
+# OpenAI Responses agent — uses web_search_preview to find a company's
+# official website URL and returns it as a single line.
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: Agent
+metadata:
+  name: company-website-lookup-agent
+  annotations:
+    ark.mckinsey.com/dashboard-icon: "/icons/openai-blue.png"
+    executor-openai-responses.ark.mckinsey.com/reasoning: '{"effort": "low"}'
+    executor-openai-responses.ark.mckinsey.com/tools: |
+      [
+        {
+          "type": "web_search_preview",
+          "user_location": { "type": "approximate", "country": "GB" }
+        }
+      ]
+spec:
+  modelRef:
+    name: gpt-5-4
+  executionEngine:
+    name: executor-openai-responses
+  prompt: |
+    You are a company research assistant.
+    Given a company name, use web search to find its official website URL.
+    Return ONLY the URL as a single line — no prose, no preamble, no explanation.
+---
+# Minimal Argo workflow: one input parameter → one Ark Query → one output.
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: company-website-lookup
+  annotations:
+    workflows.argoproj.io/title: "Company Website Lookup"
+    workflows.argoproj.io/description: |
+      Looks up a company's official website URL by name using a Responses-API
+      agent with web_search_preview.
+spec:
+  entrypoint: main
+  serviceAccountName: argo-workflow
+  arguments:
+    parameters:
+    - name: company-name
+      value: "ADAM GROOMING BN LTD"
+      description: "Company name to look up"
+    - name: agent
+      value: "company-website-lookup-agent"
+      description: "Ark agent name"
+
+  templates:
+  # DAG wraps the single step so inputs + outputs are tracked at node level
+  # in the Argo UI (otherwise the step shows "No parameters").
+  - name: main
+    inputs:
+      parameters:
+      - name: company-name
+      - name: agent
+    outputs:
+      parameters:
+      - name: website
+        valueFrom:
+          parameter: "{{tasks.lookup.outputs.parameters.website}}"
+    dag:
+      tasks:
+      - name: lookup
+        template: lookup
+        arguments:
+          parameters:
+          - name: company-name
+            value: "{{inputs.parameters.company-name}}"
+          - name: agent
+            value: "{{inputs.parameters.agent}}"
+
+  - name: lookup
+    inputs:
+      parameters:
+      - name: company-name
+      - name: agent
+    script:
+      image: alpine/k8s:1.28.13
+      command: [sh]
+      source: |
+        set -e -o pipefail
+
+        workflow_id="{{workflow.name}}"
+        query_name="${workflow_id}-lookup"
+        company_name="{{inputs.parameters.company-name}}"
+        agent_name="{{inputs.parameters.agent}}"
+
+        kubectl create -f - <<EOF >&2
+        apiVersion: ark.mckinsey.com/v1alpha1
+        kind: Query
+        metadata:
+          name: ${query_name}
+          labels:
+            workflow: "${workflow_id}"
+        spec:
+          input: "Find the official website URL for: ${company_name}"
+          target:
+            type: agent
+            name: ${agent_name}
+          timeout: 5m
+          ttl: 24h
+        EOF
+
+        kubectl wait --for=condition=Completed --timeout=5m query/${query_name}
+
+        phase=$(kubectl get query "${query_name}" -o jsonpath='{.status.phase}')
+        if [ "${phase}" = "error" ]; then
+          kubectl get query "${query_name}" -o jsonpath='{.status.response.raw}' >&2
+          exit 1
+        fi
+
+        website=$(kubectl get query "${query_name}" -o jsonpath='{.status.response.content}')
+        printf '%s' "${website}" > /tmp/website.txt
+        echo "Company: ${company_name}"
+        echo "Website: ${website}"
+    outputs:
+      parameters:
+      - name: website
+        valueFrom:
+          path: /tmp/website.txt
+      artifacts:
+      - name: website
+        path: /tmp/website.txt
+        archive:
+          none: {}
