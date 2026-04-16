@@ -46,6 +46,13 @@ kubectl wait --for=condition=Available -n phoenix deployment/phoenix --timeout=5
 
 The Phoenix marketplace service creates the `otel-environment-variables` Secret in `default` (with `OTEL_EXPORTER_OTLP_ENDPOINT=http://phoenix-svc.phoenix.svc.cluster.local:6006`). The `executor-openai-responses` chart references it via `envFrom: secretRef` (optional), so install order is: Phoenix first, then executor — and traces flow automatically.
 
+If Phoenix was installed *after* the executors (e.g. the order in this repo's `make install`), restart the executor pods so they pick up the Secret, and enable the OpenAI-layer instrumentor so spans contain prompt/response/tool/token attributes — otherwise the OpenAI span in Phoenix shows `{}`. Tracks marketplace issue [#233](https://github.com/mckinsey/agents-at-scale-marketplace/issues/233).
+
+```bash
+kubectl set env deploy/executor-openai-responses OTEL_INSTRUMENTATION_ENABLED=true
+kubectl rollout restart deploy/executor-claude-agent-sdk
+```
+
 ## Apply + run
 
 ```bash
