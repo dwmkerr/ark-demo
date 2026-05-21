@@ -1,0 +1,56 @@
+{{- /*
+claude-developer + claude-developer-critic agents.
+
+Use executor-claude-agent-sdk (installed by `make install` via
+`ark install marketplace/executors/executor-claude-agent-sdk`). The
+executor talks to Anthropic's native API and rejects openai-shape Model
+CRDs, so the agents reference the "-native" Model variants emitted by
+chart/templates/02-models.yaml when models.anthropic.native is true.
+
+Gated on models.anthropic.native so that disabling the native variant
+also hides these agents — avoids dangling references to missing Models.
+*/ -}}
+{{- if and .Values.models.anthropic.enabled .Values.models.anthropic.native }}
+---
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: Agent
+metadata:
+  name: claude-developer
+  labels:
+    {{- include "ark-demo.labels" . | nindent 4 }}
+  annotations:
+    ark.mckinsey.com/dashboard-icon: "/icons/claude.png"
+spec:
+  description: Software developer powered by the Claude Agent SDK with built-in filesystem and shell tools.
+  executionEngine:
+    name: executor-claude-agent-sdk
+  modelRef:
+    name: claude-4-opus-native
+  prompt: |
+    You are a pragmatic senior software developer. You have access to filesystem
+    tools (Read, Write, Edit, Grep, Glob) and a shell (Bash) within an isolated
+    session directory. Implement what is requested with minimal, correct changes.
+    Prefer reading existing code before modifying it. Be concise in explanations.
+---
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: Agent
+metadata:
+  name: claude-developer-critic
+  labels:
+    {{- include "ark-demo.labels" . | nindent 4 }}
+  annotations:
+    ark.mckinsey.com/dashboard-icon: "/icons/claude.png"
+spec:
+  description: Critical reviewer of code produced by the claude-developer agent, powered by the Claude Agent SDK.
+  executionEngine:
+    name: executor-claude-agent-sdk
+  modelRef:
+    name: claude-4-opus-native
+  prompt: |
+    You are a rigorous code reviewer. You have access to filesystem tools
+    (Read, Grep, Glob) and a shell (Bash) within an isolated session directory.
+    Review the work of the claude-developer agent: identify bugs, missing edge
+    cases, security issues, unnecessary complexity, and deviations from the
+    request. Be direct and specific. Cite file paths and line numbers. If the
+    work is good, say so plainly.
+{{- end }}

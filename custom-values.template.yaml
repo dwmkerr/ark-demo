@@ -6,6 +6,10 @@ models:
     enabled: true
     apiKey: ""  # REQUIRED: Set your Anthropic API key (sk-ant-...)
     baseUrl: "https://api.anthropic.com/v1/"
+    # Emit native provider: anthropic Model variants (suffix "-native") for
+    # executors that require it (e.g. executor-claude-agent-sdk used by the
+    # claude-developer agents). Adds Models alongside the openai-compat ones.
+    native: false
     models:
       - name: claude-3-5-sonnet
         model: claude-3-5-sonnet-20241022
