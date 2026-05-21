@@ -101,6 +101,7 @@ The following agents will be deployed:
 | `lead-software-engineer` | Always | Lead software engineer with access to development tools, GitHub operations, and best practices | Conditional: GitHub tools, AI Developer Guide tools, shell subagent |
 | `github-agent` | `mcpServers.github.enabled` | GitHub specialist for repository management, issues, pull requests, workflows, and security | All GitHub MCP tools |
 | `shell-subagent` | `mcpServers.shell.enabled` | Specialized shell operations agent that executes commands safely (used as agent-as-tool) | Shell MCP tool |
+| `note-taker` | `mcpServers.notion.enabled` | Notion-backed shared notes; requires an Anthropic-capable model — defaults to `claude-4-opus` | All 14 Notion MCP tools |
 
 ### Teams
 
@@ -131,6 +132,7 @@ MCP servers can be enabled via Helm dependencies in `custom-values.yaml`:
 | [AI Developer Guide](https://github.com/dwmkerr/ai-developer-guide) | `mcpServers.aiDeveloperGuide.enabled` | `helm install ai-developer-guide-mcp oci://ghcr.io/dwmkerr/charts/ai-developer-guide-mcp` |
 | AWS Knowledge | `mcpServers.awsKnowledge.enabled` | Remote MCP server (no install needed) |
 | Microsoft Learn | `mcpServers.microsoftLearn.enabled` | Remote MCP server (no install needed) |
+| Notion | `mcpServers.notion.enabled` | Remote MCP server; populate token with `ark mcp auth login notion` after install |
 
 Set to `true` in `custom-values.yaml` and run `make install`.
 

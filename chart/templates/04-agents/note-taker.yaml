@@ -1,0 +1,69 @@
+{{- /*
+Note-taker agent — Notion-backed shared notes.
+
+Model selection: defaults to claude-4-opus. Empirically, Notion's search
+tool description has examples + "don't combine X" warnings that
+stronger tool-followers (Claude Sonnet/Opus) heed. Weaker or older
+models (e.g. azure-gpt-4.1, gemini-2-5-flash-lite, claude-3-5-haiku
+variants) tend to over-filter — they chain get-teams -> search with a
+teamspace_id, use literal "*" as the query, and omit the required
+`filters: {}` field, returning empty results against a workspace that
+has plenty of pages. If you swap the model to one of those, expect to
+either tighten the prompt or accept worse tool-call fidelity.
+
+All 14 Notion MCP tools are wired so the agent can both read and
+write notes (search, fetch, get-comments/teams/users, create-pages,
+update-page, create-comment, duplicate-page, move-pages, plus the
+database/view/data-source admin tools). Trim this list if your
+operator persona is read-only.
+*/ -}}
+{{- if and .Values.mcpServers .Values.mcpServers.notion .Values.mcpServers.notion.enabled }}
+---
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: Agent
+metadata:
+  name: note-taker
+  labels:
+    {{- include "ark-demo.labels" . | nindent 4 }}
+  annotations:
+    ark.mckinsey.com/dashboard-icon: "/icons/notion.png"
+spec:
+  description: Notion-backed shared notes; reads and writes pages, comments, and views.
+  modelRef:
+    name: {{ (.Values.agents | default dict).noteTaker | default dict | dig "model" "claude-4-opus" }}
+  prompt: |
+    You use the 'notion' MCP tools to find, read, and write notes in
+    Notion on behalf of the user. Search with natural-language queries
+    rather than wildcards. Do not narrow searches by teamspace unless
+    the user explicitly names a team. Always pass `filters: {}` when
+    the search tool requires it, even if you have nothing to filter.
+  tools:
+    - name: notion-notion-search
+      type: mcp
+    - name: notion-notion-fetch
+      type: mcp
+    - name: notion-notion-get-comments
+      type: mcp
+    - name: notion-notion-get-teams
+      type: mcp
+    - name: notion-notion-get-users
+      type: mcp
+    - name: notion-notion-create-pages
+      type: mcp
+    - name: notion-notion-update-page
+      type: mcp
+    - name: notion-notion-create-comment
+      type: mcp
+    - name: notion-notion-duplicate-page
+      type: mcp
+    - name: notion-notion-move-pages
+      type: mcp
+    - name: notion-notion-create-database
+      type: mcp
+    - name: notion-notion-create-view
+      type: mcp
+    - name: notion-notion-update-view
+      type: mcp
+    - name: notion-notion-update-data-source
+      type: mcp
+{{- end }}
