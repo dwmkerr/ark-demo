@@ -26,6 +26,14 @@ output "laptop_access" {
   EOT
 }
 
+output "node_instance_id" {
+  value = module.compute.instance_id
+}
+
+output "region" {
+  value = var.region
+}
+
 output "demo_release" {
   value = module.ark.release_name
 }
