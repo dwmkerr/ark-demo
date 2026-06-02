@@ -34,6 +34,10 @@ output "region" {
   value = var.region
 }
 
+output "tenant_namespace" {
+  value = var.tenant_namespace
+}
+
 output "demo_release" {
   value = module.ark.release_name
 }

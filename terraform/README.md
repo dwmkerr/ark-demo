@@ -11,8 +11,12 @@ Provisions the cheapest credible Kubernetes demo on AWS and installs Ark + the
   [k3s](https://k3s.io) (full Kubernetes, single binary). cloud-init installs
   k3s and writes a kubeconfig (server rewritten to the Elastic IP) into SSM
   Parameter Store.
-- **ark** — reads that kubeconfig and installs the Ark operator + the local
-  `ark-demo` Helm chart via `helm_release`.
+- **ark** — reads that kubeconfig and installs, via `helm_release`:
+  - cert-manager (cluster) and the Ark operator (`ark-controller`,
+    `ark-completions`) in `ark-system`;
+  - a tenant namespace (`demo`) provisioned by `ark-tenant` (service account,
+    RBAC, quota), into which the local `ark-demo` chart deploys its
+    Models/Agents/Teams.
 
 Cost: ~$27/mo on-demand, ~$10/mo spot. Real saving is `destroy` between demos.
 

@@ -60,7 +60,8 @@ resource "helm_release" "ark_completions" {
   depends_on = [helm_release.ark_controller]
 }
 
-# ark-tenant — mandatory; provisions tenant namespace RBAC.
+# ark-tenant — installs INTO the tenant namespace, creating its service account,
+# RBAC, and quota. The controller impersonates this SA to reconcile tenant CRs.
 resource "helm_release" "ark_tenant" {
   count = var.install_ark ? 1 : 0
 
@@ -68,7 +69,7 @@ resource "helm_release" "ark_tenant" {
   repository       = var.ark_registry
   chart            = "ark-tenant"
   version          = var.ark_version
-  namespace        = var.ark_namespace
+  namespace        = var.tenant_namespace
   create_namespace = true
   wait             = true
 
@@ -78,10 +79,11 @@ resource "helm_release" "ark_tenant" {
 # The ark-demo chart (this repo): Models/Agents/Teams/MCP CRs. A provider's key
 # is set only when supplied, mirroring the chart's env-var enable behaviour.
 resource "helm_release" "ark_demo" {
-  name             = "dwmkerr-ark-demo"
-  chart            = var.ark_demo_chart_path
-  namespace        = var.namespace
-  create_namespace = true
+  name      = "dwmkerr-ark-demo"
+  chart     = var.ark_demo_chart_path
+  namespace = var.tenant_namespace
+  # ark-tenant already created and owns the namespace.
+  create_namespace = false
 
   # Pull the OCI MCP-server sub-chart dependencies before install.
   dependency_update = true

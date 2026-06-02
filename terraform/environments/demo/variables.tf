@@ -37,6 +37,12 @@ variable "install_ark" {
   description = "Install Ark (cert-manager + controller + completions + tenant). Set false if already on cluster."
 }
 
+variable "tenant_namespace" {
+  type        = string
+  default     = "demo"
+  description = "Tenant namespace for ark-tenant RBAC and the ark-demo CRs."
+}
+
 variable "model_api_keys" {
   type = object({
     anthropic = optional(string, "")

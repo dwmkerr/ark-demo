@@ -1,12 +1,13 @@
-variable "namespace" {
+variable "ark_namespace" {
   type        = string
-  default     = "default"
-  description = "Namespace for the ark-demo CRs."
+  default     = "ark-system"
+  description = "Cluster operator namespace (ark-controller, ark-completions)."
 }
 
-variable "ark_namespace" {
-  type    = string
-  default = "ark-system"
+variable "tenant_namespace" {
+  type        = string
+  default     = "demo"
+  description = "Tenant namespace — ark-tenant provisions its RBAC, and the ark-demo CRs live here."
 }
 
 # Set false if Ark is already installed on the cluster (skips operator + prereqs).
