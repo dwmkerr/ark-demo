@@ -66,3 +66,16 @@ upgrade-storage-backend-postgres: # switch the Ark controller storage backend to
 	helm upgrade ark-controller oci://ghcr.io/mckinsey/agents-at-scale-ark/charts/ark-controller \
 		--namespace ark-system --reuse-values \
 		--set storage.backend=postgresql
+
+REGION ?= eu-west-1
+
+.PHONY: tunnel
+tunnel: # open an SSM port-forward to the ark-demo k3s API (use 'kubectl --context ark-demo' in another shell)
+	@id=$$(aws ec2 describe-instances --region $(REGION) \
+		--filters "Name=tag:Name,Values=ark-demo-node" "Name=instance-state-name,Values=running" \
+		--query 'Reservations[0].Instances[0].InstanceId' --output text) && \
+	[ "$$id" != "None" ] || { echo "no running ark-demo-node found"; exit 1; } && \
+	echo "Tunnel to $$id :6443 -> localhost:6443. Leave running; use 'kubectl --context ark-demo' elsewhere." && \
+	aws ssm start-session --target $$id --region $(REGION) \
+		--document-name AWS-StartPortForwardingSession \
+		--parameters '{"portNumber":["6443"],"localPortNumber":["6443"]}'
