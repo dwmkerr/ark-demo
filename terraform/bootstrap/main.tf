@@ -19,12 +19,11 @@ provider "aws" {
 
 data "aws_caller_identity" "current" {}
 
-# GitHub's OIDC thumbprint is no longer validated by AWS, but the provider
-# resource still requires the field; this is the well-known value.
-resource "aws_iam_openid_connect_provider" "github" {
-  url             = "https://token.actions.githubusercontent.com"
-  client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
+# Only one OIDC provider per URL is allowed per account, and it is often shared
+# across repos. Reference the existing one rather than managing (and on destroy,
+# deleting) it. If it does not exist yet, create it once out-of-band.
+data "aws_iam_openid_connect_provider" "github" {
+  url = "https://token.actions.githubusercontent.com"
 }
 
 data "aws_iam_policy_document" "assume" {
@@ -34,7 +33,7 @@ data "aws_iam_policy_document" "assume" {
 
     principals {
       type        = "Federated"
-      identifiers = [aws_iam_openid_connect_provider.github.arn]
+      identifiers = [data.aws_iam_openid_connect_provider.github.arn]
     }
 
     condition {
