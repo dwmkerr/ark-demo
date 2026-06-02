@@ -1,0 +1,36 @@
+name: terraform-destroy
+
+# Manual teardown between demos — the real cost saver.
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  TF_WORKDIR: terraform/environments/demo
+  TF_VAR_model_api_keys: ${{ secrets.MODEL_API_KEYS_JSON }}
+
+jobs:
+  destroy:
+    runs-on: ubuntu-latest
+    environment: demo
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKDIR }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-west-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - run: terraform init
+
+      - run: terraform destroy -auto-approve -input=false

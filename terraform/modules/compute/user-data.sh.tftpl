@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Install k3s, advertising the Elastic IP so the API cert is valid for remote
+# (CI runner) access. Default Traefik ingress is kept for HTTP/HTTPS.
+curl -sfL https://get.k3s.io | \
+  INSTALL_K3S_EXEC="--tls-san ${public_ip} --node-external-ip ${public_ip}" \
+  K3S_TOKEN="${k3s_token}" \
+  sh -
+
+# Wait for the generated kubeconfig.
+until [ -f /etc/rancher/k3s/k3s.yaml ]; do sleep 2; done
+until kubectl get nodes >/dev/null 2>&1; do sleep 2; done
+
+# Public kubeconfig: server rewritten to the Elastic IP, for direct access from
+# CI / off-proxy networks. Published to SSM.
+sed "s#https://127.0.0.1:6443#https://${public_ip}:6443#" \
+  /etc/rancher/k3s/k3s.yaml > /tmp/kubeconfig.yaml
+
+aws ssm put-parameter \
+  --name "${ssm_param}" \
+  --type SecureString \
+  --value "file:///tmp/kubeconfig.yaml" \
+  --overwrite \
+  --region "${region}"
+
+# Local kubeconfig: keeps server at 127.0.0.1:6443, for laptop access via an SSM
+# port-forward (tunnels over the AWS channel, bypassing a TLS-inspecting proxy).
+aws ssm put-parameter \
+  --name "${ssm_param_local}" \
+  --type SecureString \
+  --value "file:///etc/rancher/k3s/k3s.yaml" \
+  --overwrite \
+  --region "${region}"
+
+rm -f /tmp/kubeconfig.yaml

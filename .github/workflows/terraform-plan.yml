@@ -1,0 +1,68 @@
+name: terraform-plan
+
+on:
+  pull_request:
+    paths:
+      - "terraform/**"
+      - ".github/workflows/terraform-*.yml"
+
+# OIDC: no long-lived AWS keys. pull-requests for the plan comment.
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+env:
+  TF_WORKDIR: terraform/environments/demo
+  # Model keys are an object var, passed as JSON.
+  TF_VAR_model_api_keys: ${{ secrets.MODEL_API_KEYS_JSON }}
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKDIR }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-west-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - run: terraform fmt -check -recursive
+        working-directory: terraform
+
+      - run: terraform init
+
+      - run: terraform validate
+
+      - id: plan
+        run: terraform plan -no-color -input=false
+        continue-on-error: true
+
+      - name: Comment plan
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const out = `#### Terraform Plan \`${{ steps.plan.outcome }}\`
+            <details><summary>Show plan</summary>
+
+            \`\`\`
+            ${{ steps.plan.outputs.stdout }}
+            \`\`\`
+            </details>`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: out
+            });
+
+      - if: steps.plan.outcome == 'failure'
+        run: exit 1

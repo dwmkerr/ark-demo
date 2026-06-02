@@ -1,0 +1,15 @@
+# Copy to demo.auto.tfvars and edit. Do NOT commit real values.
+region        = "eu-west-1"
+admin_cidrs   = ["YOUR.IP.ADDR.0/32"]
+instance_type = "t4g.medium"
+use_spot      = false
+
+# Ark install (cert-manager + controller + completions + tenant). Pin version.
+ark_version = "0.1.63"
+# install_ark = false   # set if Ark already on the cluster
+
+# Prefer TF_VAR_model_api_keys or CI/HCP variables over putting keys here.
+# model_api_keys = {
+#   anthropic = "sk-ant-..."
+#   gemini    = "..."
+# }

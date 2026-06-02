@@ -4,3 +4,5 @@ chart/Chart.lock
 .DS_Store
 *.devspace/
 .env
+scratch/
+.playwright-mcp/
