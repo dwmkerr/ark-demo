@@ -4,7 +4,7 @@ terraform {
   # HCP Terraform (app.terraform.io) free tier — remote state, locking, runs.
   # Create the org + workspace in the UI, then `terraform login`.
   cloud {
-    organization = "CHANGE-ME"
+    organization = "dwmkerr"
 
     workspaces {
       name = "ark-demo"
