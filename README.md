@@ -7,6 +7,7 @@ This demo kit includes Models, Agents, Agents-as-Tools (sometimes called "Sub-ag
 <!-- vim-markdown-toc GFM -->
 
 - [Quickstart](#quickstart)
+- [Demo Environment Setup](#demo-environment-setup)
 - [Resources Created](#resources-created)
     - [Models](#models)
     - [Agents](#agents)
@@ -78,6 +79,38 @@ kubectl get agents
 kubectl get mcpservers
 kubectl get tools
 ```
+
+## Demo Environment Setup
+
+The Quickstart assumes you already have a Kubernetes cluster with Ark installed.
+To stand up a complete demo environment from scratch on AWS — cluster, Ark, and
+this chart — use the Terraform config in [`terraform/`](./terraform/README.md).
+
+It provisions the cheapest credible setup: a single Graviton EC2 running
+[k3s](https://k3s.io) (no NAT gateway, no load balancer, ~$10–27/mo), then
+installs cert-manager, the Ark operator, and the `ark-demo` chart. Tear it down
+with `terraform destroy` between demos.
+
+State lives in [HCP Terraform](https://app.terraform.io) (free tier); a
+GitHub Actions pipeline runs `plan` on PRs and a gated `apply` on merge.
+
+```bash
+# Grab your model API keys straight from custom-values.yaml
+export TF_VAR_model_api_keys=$(yq -o=json -I=0 \
+  '{"anthropic": .models.anthropic.apiKey, "gemini": .models.gemini.apiKey}' \
+  custom-values.yaml)
+
+cd terraform/environments/demo
+cp demo.auto.tfvars.example demo.auto.tfvars   # set admin_cidrs to your IP/32
+terraform init
+terraform apply -target=module.network -target=module.compute   # k3s up (~3 min)
+terraform apply                                                  # Ark + ark-demo
+
+terraform output -raw kubeconfig_command       # prints how to grab the kubeconfig
+```
+
+See [`terraform/README.md`](./terraform/README.md) for prerequisites, the
+GitHub Actions pipeline, and the two-stage first-apply explanation.
 
 ## Resources Created
 
