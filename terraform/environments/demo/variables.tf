@@ -5,7 +5,13 @@ variable "region" {
 
 variable "admin_cidrs" {
   type        = list(string)
-  description = "CIDRs allowed to reach SSH and the k3s API (e.g. your IP/32)."
+  description = "CIDRs allowed to reach SSH (e.g. your IP/32)."
+}
+
+variable "api_ingress_cidrs" {
+  type        = list(string)
+  description = "CIDRs allowed to reach the k3s API (6443). Open by default so CI can install; mTLS-protected."
+  default     = ["0.0.0.0/0"]
 }
 
 variable "instance_type" {

@@ -5,10 +5,25 @@ data "aws_ssm_parameter" "ami" {
   name = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64"
 }
 
+# Kubeconfig pointing at the Elastic IP — used by Terraform/CI (runs off the
+# corporate network) and GitHub Actions to reach the API directly.
 resource "aws_ssm_parameter" "kubeconfig" {
   name  = "/${var.name}/kubeconfig"
   type  = "SecureString"
   value = "pending" # cloud-init overwrites this once k3s is up.
+
+  lifecycle {
+    ignore_changes = [value]
+  }
+}
+
+# Kubeconfig pointing at 127.0.0.1 — used from a laptop via an SSM Session
+# Manager port-forward, which tunnels over the AWS channel and so bypasses any
+# corporate TLS-inspecting proxy (which otherwise breaks the cluster's mTLS).
+resource "aws_ssm_parameter" "kubeconfig_local" {
+  name  = "/${var.name}/kubeconfig-local"
+  type  = "SecureString"
+  value = "pending"
 
   lifecycle {
     ignore_changes = [value]
@@ -30,17 +45,27 @@ resource "aws_iam_role" "node" {
   assume_role_policy = data.aws_iam_policy_document.assume.json
 }
 
-# Just enough to publish the kubeconfig parameter.
+# Just enough to publish the kubeconfig parameters.
 data "aws_iam_policy_document" "node" {
   statement {
-    actions   = ["ssm:PutParameter"]
-    resources = [aws_ssm_parameter.kubeconfig.arn]
+    actions = ["ssm:PutParameter"]
+    resources = [
+      aws_ssm_parameter.kubeconfig.arn,
+      aws_ssm_parameter.kubeconfig_local.arn,
+    ]
   }
 }
 
 resource "aws_iam_role_policy" "node" {
   role   = aws_iam_role.node.id
   policy = data.aws_iam_policy_document.node.json
+}
+
+# Enables SSM Session Manager (shell + port-forwarding) for laptop access
+# without opening SSH or trusting the corporate proxy.
+resource "aws_iam_role_policy_attachment" "ssm_core" {
+  role       = aws_iam_role.node.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
 resource "aws_iam_instance_profile" "node" {
@@ -69,10 +94,11 @@ resource "aws_instance" "node" {
   }
 
   user_data = templatefile("${path.module}/user-data.sh.tftpl", {
-    public_ip = var.node_public_ip
-    region    = var.region
-    ssm_param = aws_ssm_parameter.kubeconfig.name
-    k3s_token = var.k3s_token
+    public_ip       = var.node_public_ip
+    region          = var.region
+    ssm_param       = aws_ssm_parameter.kubeconfig.name
+    ssm_param_local = aws_ssm_parameter.kubeconfig_local.name
+    k3s_token       = var.k3s_token
   })
 
   tags = { Name = "${var.name}-node" }

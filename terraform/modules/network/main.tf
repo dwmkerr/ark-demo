@@ -50,12 +50,15 @@ resource "aws_security_group" "node" {
     cidr_blocks = var.admin_cidrs
   }
 
+  # k3s API. Authentication is client-cert mTLS, so this can be opened to CI
+  # runners. Laptops on a TLS-inspecting network should use the SSM
+  # port-forward instead (see environments/demo outputs).
   ingress {
     description = "k3s API"
     from_port   = 6443
     to_port     = 6443
     protocol    = "tcp"
-    cidr_blocks = var.admin_cidrs
+    cidr_blocks = var.api_ingress_cidrs
   }
 
   # Ingress (Traefik) open to the world for the demo.

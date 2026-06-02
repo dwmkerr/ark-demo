@@ -9,9 +9,10 @@ resource "random_password" "k3s_token" {
 }
 
 module "network" {
-  source      = "../../modules/network"
-  name        = local.name
-  admin_cidrs = var.admin_cidrs
+  source            = "../../modules/network"
+  name              = local.name
+  admin_cidrs       = var.admin_cidrs
+  api_ingress_cidrs = var.api_ingress_cidrs
 }
 
 module "compute" {

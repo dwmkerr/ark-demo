@@ -2,6 +2,10 @@ output "kubeconfig_ssm_parameter" {
   value = aws_ssm_parameter.kubeconfig.name
 }
 
+output "kubeconfig_local_ssm_parameter" {
+  value = aws_ssm_parameter.kubeconfig_local.name
+}
+
 output "instance_id" {
   value = aws_instance.node.id
 }
