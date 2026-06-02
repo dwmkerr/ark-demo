@@ -1,19 +1,39 @@
 variable "namespace" {
-  type    = string
-  default = "default"
+  type        = string
+  default     = "default"
+  description = "Namespace for the ark-demo CRs."
 }
 
-# Ark operator chart. Leave empty to skip (e.g. if Ark is already installed).
-# TODO: set to the published Ark operator chart ref, e.g.
-#   oci://ghcr.io/mckinsey/agents-at-scale-ark/ark-controller
-variable "ark_chart" {
+variable "ark_namespace" {
   type    = string
-  default = ""
+  default = "ark-system"
 }
 
-variable "ark_chart_version" {
+# Set false if Ark is already installed on the cluster (skips operator + prereqs).
+variable "install_ark" {
+  type    = bool
+  default = true
+}
+
+variable "install_cert_manager" {
+  type        = bool
+  default     = true
+  description = "Set false if cert-manager is already present."
+}
+
+variable "cert_manager_version" {
   type    = string
-  default = null
+  default = null # latest
+}
+
+variable "ark_registry" {
+  type    = string
+  default = "oci://ghcr.io/mckinsey/agents-at-scale-ark/charts"
+}
+
+variable "ark_version" {
+  type    = string
+  default = "0.1.63"
 }
 
 variable "ark_demo_chart_path" {

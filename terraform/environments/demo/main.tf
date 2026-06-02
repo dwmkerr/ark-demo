@@ -32,8 +32,8 @@ module "ark" {
   source = "../../modules/ark"
 
   ark_demo_chart_path = "${path.module}/../../../chart"
-  ark_chart           = var.ark_chart
-  ark_chart_version   = var.ark_chart_version
+  ark_version         = var.ark_version
+  install_ark         = var.install_ark
   model_api_keys      = var.model_api_keys
 
   # Don't install onto the cluster until cloud-init has it ready.

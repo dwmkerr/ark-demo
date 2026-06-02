@@ -19,15 +19,16 @@ variable "use_spot" {
   description = "Spot is ~3x cheaper but can be reclaimed mid-demo."
 }
 
-variable "ark_chart" {
+variable "ark_version" {
   type        = string
-  default     = ""
-  description = "Ark operator chart ref. Empty skips it (already installed)."
+  default     = "0.1.63"
+  description = "Ark chart version (controller/completions/tenant)."
 }
 
-variable "ark_chart_version" {
-  type    = string
-  default = null
+variable "install_ark" {
+  type        = bool
+  default     = true
+  description = "Install Ark (cert-manager + controller + completions + tenant). Set false if already on cluster."
 }
 
 variable "model_api_keys" {
