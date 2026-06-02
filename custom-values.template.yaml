@@ -38,6 +38,15 @@ models:
     enabled: false
     apiKey: ""  # OPTIONAL: Set your OpenAI API key (sk-...)
     baseUrl: "https://api.openai.com/v1/"
+    # Example models (uncomment and enable above to use).
+    # `name` must be DNS-1123 (no dots); the real model id goes in `model`.
+    # models:
+    #   - name: gpt-5-4
+    #     model: gpt-5.4-2026-03-05
+    #   - name: gpt-5-4-mini
+    #     model: gpt-5.4-mini-2026-03-17
+    #   - name: gpt-5-4-nano
+    #     model: gpt-5.4-nano-2026-03-17
     models: []
 
   # Amazon Bedrock provider - requires AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
