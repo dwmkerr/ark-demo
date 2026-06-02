@@ -80,6 +80,11 @@ resource "aws_instance" "node" {
   vpc_security_group_ids = [var.security_group_id]
   iam_instance_profile   = aws_iam_instance_profile.node.name
 
+  # cloud-init runs once per instance. Without this, editing the script only
+  # updates the attribute in state — the live node keeps its original
+  # bootstrap. Replace the instance so changes actually take effect.
+  user_data_replace_on_change = true
+
   root_block_device {
     volume_size = var.disk_gb
     volume_type = "gp3"
