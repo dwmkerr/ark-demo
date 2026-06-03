@@ -9,14 +9,16 @@ models:
     apiKey: "" # injected via set_sensitive
     baseUrl: "https://api.anthropic.com/v1/"
     models:
+      # NOTE: the claude-3-5-*-20241022 snapshots are retired at Anthropic and
+      # 404 the model probe. Use current Claude 4 ids. claude-opus-4-20250514 is
+      # verified Available against this endpoint.
+      #
       # 'default' is the model agents fall back to (planner, team-leader,
       # lead-software-engineer all reference it).
       - name: default
-        model: claude-3-5-sonnet-20241022
-      - name: claude-3-5-sonnet
-        model: claude-3-5-sonnet-20241022
-      - name: claude-3-5-haiku
-        model: claude-3-5-haiku-20241022
+        model: claude-opus-4-20250514
+      - name: claude-sonnet-4
+        model: claude-sonnet-4-20250514
       # Referenced by the code-reviewer agent.
       - name: claude-4-opus
         model: claude-opus-4-20250514
