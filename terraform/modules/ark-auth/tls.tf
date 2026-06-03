@@ -17,22 +17,26 @@ resource "kubernetes_manifest" "cluster_issuer" {
       name = local.cluster_issuer
     }
     spec = {
-      acme = {
-        server = "https://acme-v02.api.letsencrypt.org/directory"
-        email  = var.acme_email
-        privateKeySecretRef = {
-          name = "letsencrypt-account-key"
-        }
-        solvers = [
-          {
-            http01 = {
-              ingress = {
-                class = "traefik"
+      # email is optional for Let's Encrypt; omit it entirely when not set so no
+      # contact address is registered.
+      acme = merge(
+        {
+          server = "https://acme-v02.api.letsencrypt.org/directory"
+          privateKeySecretRef = {
+            name = "letsencrypt-account-key"
+          }
+          solvers = [
+            {
+              http01 = {
+                ingress = {
+                  class = "traefik"
+                }
               }
-            }
-          },
-        ]
-      }
+            },
+          ]
+        },
+        var.acme_email == "" ? {} : { email = var.acme_email },
+      )
     }
   }
 }
