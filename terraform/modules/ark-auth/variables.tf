@@ -45,6 +45,20 @@ variable "dashboard_image_tag" {
   description = "Override tag for ark-dashboard image. Empty = use chart default (Chart.AppVersion)."
 }
 
+# Same override surface for ark-api — useful when testing a fork-built
+# branch (e.g. the OIDC JWKS-discovery fix in #2322).
+variable "ark_api_image_repository" {
+  type        = string
+  default     = ""
+  description = "Override repository for ark-api image. Empty = use chart default."
+}
+
+variable "ark_api_image_tag" {
+  type        = string
+  default     = ""
+  description = "Override tag for ark-api image. Empty = use chart default (Chart.AppVersion)."
+}
+
 variable "github_oauth_client_id" {
   type        = string
   sensitive   = true

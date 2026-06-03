@@ -15,19 +15,27 @@ resource "helm_release" "ark_api" {
   wait             = true
 
   values = [yamlencode({
-    app = {
-      env = [
-        { name = "CORS_ORIGINS", value = "*" },
-        { name = "OIDC_ISSUER_URL", value = local.dex_issuer },
-        { name = "OIDC_APPLICATION_ID", value = local.dashboard_client_id },
-        { name = "AUTH_MODE", value = "sso" },
-        { name = "PROXY_TIMEOUT", value = "10.0" },
-        { name = "ARK_A2A_AGENT_CARD_PORT", value = "443" },
-        { name = "ARK_A2A_AGENT_CARD_HOST", value = local.api_host },
-        { name = "ARK_A2A_AGENT_CARD_PROTOCOL", value = "https" },
-        { name = "READ_ONLY_MODE", value = "false" },
-      ]
-    }
+    app = merge(
+      var.ark_api_image_repository == "" ? {} : {
+        image = {
+          repository = var.ark_api_image_repository
+          tag        = var.ark_api_image_tag
+        }
+      },
+      {
+        env = [
+          { name = "CORS_ORIGINS", value = "*" },
+          { name = "OIDC_ISSUER_URL", value = local.dex_issuer },
+          { name = "OIDC_APPLICATION_ID", value = local.dashboard_client_id },
+          { name = "AUTH_MODE", value = "sso" },
+          { name = "PROXY_TIMEOUT", value = "10.0" },
+          { name = "ARK_A2A_AGENT_CARD_PORT", value = "443" },
+          { name = "ARK_A2A_AGENT_CARD_HOST", value = local.api_host },
+          { name = "ARK_A2A_AGENT_CARD_PROTOCOL", value = "https" },
+          { name = "READ_ONLY_MODE", value = "false" },
+        ]
+      }
+    )
     # Impersonate the authenticated GitHub user (preferred_username) so k8s RBAC
     # applies per user.
     impersonation = {
