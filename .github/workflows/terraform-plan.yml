@@ -24,6 +24,8 @@ env:
   # Optional ark-dashboard image override (e.g. a fork build for issue #2318).
   TF_VAR_dashboard_image_repository: ${{ vars.DASHBOARD_IMAGE_REPOSITORY }}
   TF_VAR_dashboard_image_tag: ${{ vars.DASHBOARD_IMAGE_TAG }}
+  TF_VAR_ark_api_image_repository: ${{ vars.ARK_API_IMAGE_REPOSITORY }}
+  TF_VAR_ark_api_image_tag: ${{ vars.ARK_API_IMAGE_TAG }}
 
 jobs:
   plan:
