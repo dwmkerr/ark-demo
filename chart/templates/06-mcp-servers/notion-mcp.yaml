@@ -1,0 +1,45 @@
+{{- /*
+Notion MCPServer plus shell token Secret.
+
+The Secret ships empty by design. No chart packages OAuth tokens — the
+operator runs `ark mcp auth login notion` post-install to populate
+`data.token` via OAuth device flow. The shell exists in-chart so a fresh
+`helm install` provides a stable target for the CLI patch.
+
+The `ark.mckinsey.com/mcp-token-secret: "true"` label opts the Secret into
+the Ark controller's Secret watch. With the label, MCPServer state
+reconciles immediately when the CLI patches the token. Without it,
+reconciliation still happens on the next periodic resync.
+
+Temporary home: Notion will move into the Ark marketplace
+(mckinsey/agents-at-scale-marketplace) once that chart is published. Demo
+and dogfooding live here until then.
+*/ -}}
+{{- if and .Values.mcpServers .Values.mcpServers.notion .Values.mcpServers.notion.enabled }}
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: MCPServer
+metadata:
+  name: notion
+  annotations:
+    ark.mckinsey.com/dashboard-icon: "/icons/notion.png"
+spec:
+  address:
+    value: "https://mcp.notion.com/mcp"
+  authorization:
+    tokenSecretRef:
+      name: {{ .Values.mcpServers.notion.secretName | default "notion-oauth" }}
+  pollInterval: "30s"
+  timeout: "1m"
+  transport: http
+  description: "Notion MCP server"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.mcpServers.notion.secretName | default "notion-oauth" }}
+  labels:
+    {{- include "ark-demo.labels" . | nindent 4 }}
+    ark.mckinsey.com/mcp-token-secret: "true"
+type: Opaque
+data: {}
+{{- end }}

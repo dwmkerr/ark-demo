@@ -30,6 +30,43 @@ spec:
 {{- end }}
 {{- end }}
 
+{{- /*
+Native Anthropic-provider Model variants (suffix "-native") for executors
+that require provider: anthropic — notably executor-claude-agent-sdk, which
+uses the Claude Agent SDK directly and rejects openai-shaped Model CRDs.
+Emitted alongside the openai-compat shape above so existing agents keep
+working; only opt-in agents reference the -native variants.
+*/ -}}
+{{- if and .Values.models.anthropic.enabled .Values.models.anthropic.native }}
+{{- range .Values.models.anthropic.models }}
+{{- if not (and (eq .name "default") $.Values.skipDefaultModel) }}
+---
+apiVersion: ark.mckinsey.com/v1alpha1
+kind: Model
+metadata:
+  name: {{ .name }}-native
+  labels:
+    {{- include "ark-demo.labels" $ | nindent 4 }}
+  annotations:
+    ark.mckinsey.com/dashboard-icon: "/icons/claude.png"
+spec:
+  provider: anthropic
+  model:
+    value: {{ .model }}
+  pollInterval: 1m
+  config:
+    anthropic:
+      baseUrl:
+        value: "https://api.anthropic.com"
+      apiKey:
+        valueFrom:
+          secretKeyRef:
+            name: anthropic-api-key
+            key: apiKey
+{{- end }}
+{{- end }}
+{{- end }}
+
 {{- if .Values.models.gemini.enabled }}
 {{- range .Values.models.gemini.models }}
 {{- if not (and (eq .name "default") $.Values.skipDefaultModel) }}
