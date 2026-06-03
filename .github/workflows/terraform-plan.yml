@@ -38,6 +38,10 @@ jobs:
       - run: terraform fmt -check -recursive
         working-directory: terraform
 
+      # Build the ark-demo chart's OCI dependencies; the helm provider can't.
+      - uses: azure/setup-helm@v4
+      - run: helm dependency update ../../../chart
+
       - run: terraform init
 
       - run: terraform validate

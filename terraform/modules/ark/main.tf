@@ -85,8 +85,10 @@ resource "helm_release" "ark_demo" {
   # ark-tenant already created and owns the namespace.
   create_namespace = false
 
-  # Pull the OCI MCP-server sub-chart dependencies before install.
-  dependency_update = true
+  # NOTE: the helm provider panics resolving OCI chart dependencies
+  # (dependency_update=true -> nil registry client). Build deps with the helm
+  # CLI before terraform runs (see the terraform workflows / 'make install').
+  dependency_update = false
 
   dynamic "set_sensitive" {
     for_each = { for k, v in var.model_api_keys : k => v if v != "" }
