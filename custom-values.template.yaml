@@ -6,6 +6,10 @@ models:
     enabled: true
     apiKey: ""  # REQUIRED: Set your Anthropic API key (sk-ant-...)
     baseUrl: "https://api.anthropic.com/v1/"
+    # Emit native provider: anthropic Model variants (suffix "-native") for
+    # executors that require it (e.g. executor-claude-agent-sdk used by the
+    # claude-developer agents). Adds Models alongside the openai-compat ones.
+    native: false
     models:
       - name: claude-3-5-sonnet
         model: claude-3-5-sonnet-20241022
@@ -89,6 +93,18 @@ mcpServers:
   # Microsoft Learn MCP server
   microsoftLearn:
     enabled: true
+
+  # Notion MCP server - token populated via `ark mcp auth login notion`
+  notion:
+    enabled: false
+    # secretName: notion-oauth  # Override the shell Secret name if needed
+
+# Agent configuration
+agents:
+  noteTaker:
+    # Override the model the note-taker uses. Default: claude-4-opus.
+    # See chart/templates/04-agents/note-taker.yaml for the rationale.
+    # model: claude-4-opus
 
 # Subchart configuration
 ai-developer-guide-mcp:
