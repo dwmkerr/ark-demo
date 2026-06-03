@@ -85,6 +85,9 @@ resource "helm_release" "ark_demo" {
   # ark-tenant already created and owns the namespace.
   create_namespace = false
 
+  # The chart ships no values.yaml; supply the full structure from a file.
+  values = [for f in var.ark_demo_values_files : file(f)]
+
   # NOTE: the helm provider panics resolving OCI chart dependencies
   # (dependency_update=true -> nil registry client). Build deps with the helm
   # CLI before terraform runs (see the terraform workflows / 'make install').
