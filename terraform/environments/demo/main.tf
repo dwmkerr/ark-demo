@@ -32,11 +32,12 @@ module "compute" {
 module "ark" {
   source = "../../modules/ark"
 
-  ark_demo_chart_path = "${path.module}/../../../chart"
-  ark_version         = var.ark_version
-  install_ark         = var.install_ark
-  tenant_namespace    = var.tenant_namespace
-  model_api_keys      = var.model_api_keys
+  ark_demo_chart_path   = "${path.module}/../../../chart"
+  ark_demo_values_files = ["${path.module}/ark-demo-values.yaml"]
+  ark_version           = var.ark_version
+  install_ark           = var.install_ark
+  tenant_namespace      = var.tenant_namespace
+  model_api_keys        = var.model_api_keys
 
   # Don't install onto the cluster until cloud-init has it ready.
   depends_on = [module.compute]

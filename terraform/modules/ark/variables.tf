@@ -42,6 +42,12 @@ variable "ark_demo_chart_path" {
   description = "Path to the local ark-demo chart."
 }
 
+variable "ark_demo_values_files" {
+  type        = list(string)
+  default     = []
+  description = "Values files for the ark-demo chart (the chart ships none)."
+}
+
 variable "model_api_keys" {
   type = object({
     anthropic = optional(string, "")

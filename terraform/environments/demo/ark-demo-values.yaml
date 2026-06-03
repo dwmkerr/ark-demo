@@ -1,0 +1,52 @@
+# Values for the ark-demo chart in the Terraform-managed demo environment.
+# The chart ships no values.yaml, so this supplies the full structure. API keys
+# are injected separately via set_sensitive (from model_api_keys), so they stay
+# out of version control. Providers/MCP servers needing extra secrets or config
+# are disabled to keep the CI install self-contained.
+models:
+  anthropic:
+    enabled: true
+    apiKey: "" # injected via set_sensitive
+    baseUrl: "https://api.anthropic.com/v1/"
+    models:
+      - name: claude-3-5-sonnet
+        model: claude-3-5-sonnet-20241022
+      - name: claude-3-5-haiku
+        model: claude-3-5-haiku-20241022
+
+  gemini:
+    enabled: true
+    apiKey: "" # injected via set_sensitive
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/"
+    models:
+      - name: gemini-2-5-flash-lite
+        model: gemini-2.5-flash-lite
+
+  azureOpenAI:
+    enabled: false
+    apiKey: ""
+    models: []
+
+  openai:
+    enabled: false
+    apiKey: ""
+    models: []
+
+  bedrock:
+    enabled: false
+
+# MCP servers off by default: shell/shellwright/aiDeveloperGuide pull subcharts,
+# github needs a token. Enable selectively once the base demo is verified.
+mcpServers:
+  shell:
+    enabled: false
+  github:
+    enabled: false
+  shellwright:
+    enabled: false
+  aiDeveloperGuide:
+    enabled: false
+  awsKnowledge:
+    enabled: false
+  microsoftLearn:
+    enabled: false
