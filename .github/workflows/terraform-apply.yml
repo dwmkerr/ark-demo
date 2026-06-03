@@ -1,6 +1,8 @@
 name: terraform-apply
 
 on:
+  # Manual trigger for on-demand rebuilds (e.g. after a terraform-destroy).
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
