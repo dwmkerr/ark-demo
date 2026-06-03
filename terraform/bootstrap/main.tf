@@ -56,9 +56,55 @@ resource "aws_iam_role" "ci" {
   assume_role_policy = data.aws_iam_policy_document.assume.json
 }
 
-# Demo scope — broad enough to manage EC2/VPC/SSM/IAM-passrole for the env.
-# Tighten before any non-demo use.
+# Covers EC2/VPC/SSM/etc, but explicitly NOT IAM.
 resource "aws_iam_role_policy_attachment" "power" {
   role       = aws_iam_role.ci.name
   policy_arn = "arn:aws:iam::aws:policy/PowerUserAccess"
+}
+
+# PowerUserAccess excludes IAM, but the compute module manages the node's role
+# and instance profile. Grant just those IAM actions, scoped to ark-demo-* names.
+data "aws_iam_policy_document" "ci_iam" {
+  statement {
+    sid = "ManageDemoNodeIAM"
+    actions = [
+      "iam:CreateRole",
+      "iam:DeleteRole",
+      "iam:GetRole",
+      "iam:TagRole",
+      "iam:UntagRole",
+      "iam:ListRolePolicies",
+      "iam:ListAttachedRolePolicies",
+      "iam:ListInstanceProfilesForRole",
+      "iam:ListRoleTags",
+      "iam:PutRolePolicy",
+      "iam:GetRolePolicy",
+      "iam:DeleteRolePolicy",
+      "iam:AttachRolePolicy",
+      "iam:DetachRolePolicy",
+      "iam:CreateInstanceProfile",
+      "iam:DeleteInstanceProfile",
+      "iam:GetInstanceProfile",
+      "iam:AddRoleToInstanceProfile",
+      "iam:RemoveRoleFromInstanceProfile",
+      "iam:TagInstanceProfile",
+      "iam:ListInstanceProfileTags",
+    ]
+    resources = [
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/ark-demo-*",
+      "arn:aws:iam::${data.aws_caller_identity.current.account_id}:instance-profile/ark-demo-*",
+    ]
+  }
+
+  statement {
+    sid       = "PassDemoNodeRole"
+    actions   = ["iam:PassRole"]
+    resources = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/ark-demo-*"]
+  }
+}
+
+resource "aws_iam_role_policy" "ci_iam" {
+  name   = "ark-demo-ci-iam"
+  role   = aws_iam_role.ci.id
+  policy = data.aws_iam_policy_document.ci_iam.json
 }
