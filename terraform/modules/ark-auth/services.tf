@@ -1,10 +1,10 @@
-# ark-api and ark-dashboard, wired to Dex for SSO. Both charts inject env vars
-# from the app.env LIST, so values are set positionally by array index; we set
-# both .name and .value at each index so the override is self-describing and
-# does not depend on the chart's default ordering staying stable.
+# ark-api + ark-dashboard with GitHub-via-Dex SSO.
+#
+# Both charts render env by ranging over app.env (a list). Setting entries by
+# index (--set app.env[N]) pads missing indices with null and crashes the
+# template (nil .name), so we supply the COMPLETE env list via values and
+# override only the two secrets by their (now stable) index with set_sensitive.
 
-# ark-api — FastAPI backend. SSO validates Dex-issued JWTs; impersonation makes
-# RBAC apply to the GitHub user (via preferred_username) rather than the SA.
 resource "helm_release" "ark_api" {
   name             = "ark-api"
   repository       = var.ark_registry
@@ -14,86 +14,38 @@ resource "helm_release" "ark_api" {
   create_namespace = true
   wait             = true
 
-  # Auth env (app.env list): [1]=OIDC_ISSUER_URL, [2]=OIDC_APPLICATION_ID,
-  # [3]=AUTH_MODE in the chart's default values.yaml.
-  set {
-    name  = "app.env[1].name"
-    value = "OIDC_ISSUER_URL"
-  }
-  set {
-    name  = "app.env[1].value"
-    value = local.dex_issuer
-  }
-  set {
-    name  = "app.env[2].name"
-    value = "OIDC_APPLICATION_ID"
-  }
-  set {
-    name  = "app.env[2].value"
-    value = local.dashboard_client_id
-  }
-  set {
-    name  = "app.env[3].name"
-    value = "AUTH_MODE"
-  }
-  set {
-    name  = "app.env[3].value"
-    value = "sso"
-  }
-
-  # Impersonation block — own top-level keys, not part of app.env.
-  set {
-    name  = "impersonation.enabled"
-    value = "true"
-  }
-  set {
-    name  = "impersonation.usernameClaim"
-    value = local.username_claim
-  }
-  set {
-    name  = "impersonation.groupsClaim"
-    value = "groups"
-  }
-
-  # Ingress (traefik + cert-manager TLS via the letsencrypt ClusterIssuer).
-  set {
-    name  = "ingress.enabled"
-    value = "true"
-  }
-  set {
-    name  = "ingress.className"
-    value = "traefik"
-  }
-  set {
-    name  = "ingress.annotations.cert-manager\\.io/cluster-issuer"
-    value = local.cluster_issuer
-  }
-  set {
-    name  = "ingress.hosts[0].host"
-    value = local.api_host
-  }
-  set {
-    name  = "ingress.hosts[0].paths[0].path"
-    value = "/"
-  }
-  set {
-    name  = "ingress.hosts[0].paths[0].pathType"
-    value = "Prefix"
-  }
-  set {
-    name  = "ingress.tls[0].secretName"
-    value = "ark-api-tls"
-  }
-  set {
-    name  = "ingress.tls[0].hosts[0]"
-    value = local.api_host
-  }
+  values = [yamlencode({
+    app = {
+      env = [
+        { name = "CORS_ORIGINS", value = "*" },
+        { name = "OIDC_ISSUER_URL", value = local.dex_issuer },
+        { name = "OIDC_APPLICATION_ID", value = local.dashboard_client_id },
+        { name = "AUTH_MODE", value = "sso" },
+        { name = "PROXY_TIMEOUT", value = "10.0" },
+        { name = "ARK_A2A_AGENT_CARD_PORT", value = "443" },
+        { name = "ARK_A2A_AGENT_CARD_HOST", value = local.api_host },
+        { name = "ARK_A2A_AGENT_CARD_PROTOCOL", value = "https" },
+        { name = "READ_ONLY_MODE", value = "false" },
+      ]
+    }
+    # Impersonate the authenticated GitHub user (preferred_username) so k8s RBAC
+    # applies per user.
+    impersonation = {
+      enabled       = true
+      fallback      = false
+      usernameClaim = local.username_claim
+      groupsClaim   = "groups"
+    }
+    ingress = {
+      enabled     = true
+      className   = "traefik"
+      annotations = { "cert-manager.io/cluster-issuer" = local.cluster_issuer }
+      hosts       = [{ host = local.api_host, paths = [{ path = "/", pathType = "Prefix" }] }]
+      tls         = [{ secretName = "ark-api-tls", hosts = [local.api_host] }]
+    }
+  })]
 }
 
-# ark-dashboard — Next.js UI. NextAuth handles the OIDC code flow against Dex,
-# then calls ark-api in-cluster. The dashboard targets ark-api via the discrete
-# app.config.arkApiService.{host,port,protocol} keys (chart has no single URL
-# value); defaults are host=ark-api, port=80, protocol=http.
 resource "helm_release" "ark_dashboard" {
   name             = "ark-dashboard"
   repository       = var.ark_registry
@@ -103,128 +55,44 @@ resource "helm_release" "ark_dashboard" {
   create_namespace = true
   wait             = true
 
-  # In-cluster ark-api target (Service is named ark-api on port 80).
-  set {
-    name  = "app.config.arkApiService.host"
-    value = "ark-api.${var.ark_namespace}"
-  }
-  set {
-    name  = "app.config.arkApiService.port"
-    value = "80"
-  }
-  set {
-    name  = "app.config.arkApiService.protocol"
-    value = "http"
-  }
+  values = [yamlencode({
+    app = {
+      # Dashboard proxies to ark-api in-cluster (same namespace).
+      config = {
+        arkApiService = { host = "ark-api", port = "80", protocol = "http" }
+      }
+      env = [
+        { name = "BASE_URL", value = local.dashboard_url },                      # 0
+        { name = "AUTH_URL", value = "${local.dashboard_url}/api/auth" },        # 1
+        { name = "AUTH_SECRET", value = "" },                                    # 2 (set_sensitive)
+        { name = "OIDC_ISSUER_URL", value = local.dex_issuer },                  # 3
+        { name = "OIDC_CLIENT_ID", value = local.dashboard_client_id },          # 4
+        { name = "OIDC_CLIENT_SECRET", value = "" },                             # 5 (set_sensitive)
+        { name = "OIDC_PROVIDER_NAME", value = "GitHub" },                       # 6
+        { name = "OIDC_PROVIDER_ID", value = "dex" },                            # 7
+        { name = "SESSION_MAX_AGE", value = "1800" },                            # 8
+        { name = "NEXT_PUBLIC_TOKEN_REFRESH_INTERVAL_MS", value = "600000" },    # 9
+        { name = "NEXT_PUBLIC_FALLBACK_INACTIVITY_TIMEOUT", value = "1800000" }, # 10
+        { name = "AUTH_MODE", value = "sso" },                                   # 11
+      ]
+    }
+    ingress = {
+      enabled     = true
+      className   = "traefik"
+      annotations = { "cert-manager.io/cluster-issuer" = local.cluster_issuer }
+      hosts       = [{ host = local.dashboard_host, paths = [{ path = "/", pathType = "Prefix" }] }]
+      tls         = [{ secretName = "ark-dashboard-tls", hosts = [local.dashboard_host] }]
+    }
+  })]
 
-  # Auth env (app.env list): [0]=BASE_URL, [1]=AUTH_URL, [2]=AUTH_SECRET,
-  # [3]=OIDC_ISSUER_URL, [4]=OIDC_CLIENT_ID, [5]=OIDC_CLIENT_SECRET,
-  # [6]=OIDC_PROVIDER_NAME, [7]=OIDC_PROVIDER_ID, [10]=AUTH_MODE.
-  set {
-    name  = "app.env[0].name"
-    value = "BASE_URL"
-  }
-  set {
-    name  = "app.env[0].value"
-    value = local.dashboard_url
-  }
-  set {
-    name  = "app.env[1].name"
-    value = "AUTH_URL"
-  }
-  set {
-    name  = "app.env[1].value"
-    value = "${local.dashboard_url}/api/auth"
-  }
-  set {
-    name  = "app.env[2].name"
-    value = "AUTH_SECRET"
-  }
+  # Secrets injected over the (stable) list indices, kept out of plan output.
   set_sensitive {
     name  = "app.env[2].value"
     value = random_password.auth_secret.result
   }
-  set {
-    name  = "app.env[3].name"
-    value = "OIDC_ISSUER_URL"
-  }
-  set {
-    name  = "app.env[3].value"
-    value = local.dex_issuer
-  }
-  set {
-    name  = "app.env[4].name"
-    value = "OIDC_CLIENT_ID"
-  }
-  set {
-    name  = "app.env[4].value"
-    value = local.dashboard_client_id
-  }
-  set {
-    name  = "app.env[5].name"
-    value = "OIDC_CLIENT_SECRET"
-  }
   set_sensitive {
     name  = "app.env[5].value"
     value = random_password.dashboard_client_secret.result
-  }
-  set {
-    name  = "app.env[6].name"
-    value = "OIDC_PROVIDER_NAME"
-  }
-  set {
-    name  = "app.env[6].value"
-    value = "GitHub"
-  }
-  set {
-    name  = "app.env[7].name"
-    value = "OIDC_PROVIDER_ID"
-  }
-  set {
-    name  = "app.env[7].value"
-    value = "dex"
-  }
-  set {
-    name  = "app.env[10].name"
-    value = "AUTH_MODE"
-  }
-  set {
-    name  = "app.env[10].value"
-    value = "sso"
-  }
-
-  # Ingress (traefik + cert-manager TLS via the letsencrypt ClusterIssuer).
-  set {
-    name  = "ingress.enabled"
-    value = "true"
-  }
-  set {
-    name  = "ingress.className"
-    value = "traefik"
-  }
-  set {
-    name  = "ingress.annotations.cert-manager\\.io/cluster-issuer"
-    value = local.cluster_issuer
-  }
-  set {
-    name  = "ingress.hosts[0].host"
-    value = local.dashboard_host
-  }
-  set {
-    name  = "ingress.hosts[0].paths[0].path"
-    value = "/"
-  }
-  set {
-    name  = "ingress.hosts[0].paths[0].pathType"
-    value = "Prefix"
-  }
-  set {
-    name  = "ingress.tls[0].secretName"
-    value = "ark-dashboard-tls"
-  }
-  set {
-    name  = "ingress.tls[0].hosts[0]"
-    value = local.dashboard_host
   }
 
   depends_on = [helm_release.ark_api]
