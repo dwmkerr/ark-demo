@@ -9,18 +9,24 @@ models:
     apiKey: "" # injected via set_sensitive
     baseUrl: "https://api.anthropic.com/v1/"
     models:
+      # 'default' is the model agents fall back to (planner, team-leader,
+      # lead-software-engineer all reference it).
+      - name: default
+        model: claude-3-5-sonnet-20241022
       - name: claude-3-5-sonnet
         model: claude-3-5-sonnet-20241022
       - name: claude-3-5-haiku
         model: claude-3-5-haiku-20241022
+      # Referenced by the code-reviewer agent.
+      - name: claude-4-opus
+        model: claude-opus-4-20250514
 
+  # Disabled for now — using anthropic keys only. Re-enable with valid keys.
   gemini:
-    enabled: true
-    apiKey: "" # injected via set_sensitive
+    enabled: false
+    apiKey: ""
     baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/"
-    models:
-      - name: gemini-2-5-flash-lite
-        model: gemini-2.5-flash-lite
+    models: []
 
   azureOpenAI:
     enabled: false
