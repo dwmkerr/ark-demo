@@ -52,6 +52,18 @@ variable "enable_sso" {
   description = "Install Dex GitHub SSO + ark-dashboard/api + RBAC. Needs a GitHub OAuth App, the vars below, and ports 80/443 reachable for TLS."
 }
 
+variable "dns_zone" {
+  type        = string
+  default     = "dwmkerr.com"
+  description = "Route53 hosted zone for the demo subdomain."
+}
+
+variable "subdomain" {
+  type        = string
+  default     = "ark-demo.dwmkerr.com"
+  description = "Stable subdomain for the demo. Hosts dashboard/dex/api.<subdomain> resolve here via a wildcard A record to the EIP."
+}
+
 variable "acme_email" {
   type        = string
   default     = ""

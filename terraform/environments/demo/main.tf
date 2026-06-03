@@ -46,18 +46,36 @@ module "ark" {
 # GitHub SSO via Dex + ark-api/ark-dashboard + per-user RBAC. Off by default so
 # the base demo runs without a GitHub OAuth App / DNS / TLS; flip enable_sso on
 # once those are ready.
+# Stable DNS: a wildcard A record for the demo subdomain pointing at the current
+# EIP. Survives destroy/apply (the EIP may change; this record is updated), so
+# the GitHub OAuth App callback (https://dex.<subdomain>/callback) never changes.
+data "aws_route53_zone" "demo" {
+  count = var.enable_sso ? 1 : 0
+  name  = var.dns_zone
+}
+
+resource "aws_route53_record" "demo_wildcard" {
+  count   = var.enable_sso ? 1 : 0
+  zone_id = data.aws_route53_zone.demo[0].zone_id
+  name    = "*.${var.subdomain}"
+  type    = "A"
+  ttl     = 60
+  records = [module.network.eip_public_ip]
+}
+
 module "ark_auth" {
   count  = var.enable_sso ? 1 : 0
   source = "../../modules/ark-auth"
 
   tenant_namespace           = var.tenant_namespace
-  base_domain                = "${module.network.eip_public_ip}.nip.io"
+  base_domain                = var.subdomain
   acme_email                 = var.acme_email
   ark_version                = var.ark_version
   github_oauth_client_id     = var.github_oauth_client_id
   github_oauth_client_secret = var.github_oauth_client_secret
   demo_users                 = var.demo_users
 
-  # Needs cert-manager + the Ark operator (installed by module.ark) present.
-  depends_on = [module.ark]
+  # Needs cert-manager + the Ark operator present, and DNS resolving for the
+  # Let's Encrypt HTTP-01 challenge.
+  depends_on = [module.ark, aws_route53_record.demo_wildcard]
 }
