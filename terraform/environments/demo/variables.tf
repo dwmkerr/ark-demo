@@ -93,6 +93,21 @@ variable "demo_users" {
   description = "Per-GitHub-user role allowlist: role is viewer | editor | admin."
 }
 
+# Override the image the ark-dashboard chart deploys. Leave empty to use
+# the chart's pinned upstream image; set both to test a fork-built branch
+# (e.g. ghcr.io/dwmkerr/ark-dashboard:fork-build-fix-2318-d591a69).
+variable "dashboard_image_repository" {
+  type        = string
+  default     = ""
+  description = "Override repository for ark-dashboard image. Empty = chart default."
+}
+
+variable "dashboard_image_tag" {
+  type        = string
+  default     = ""
+  description = "Override tag for ark-dashboard image. Empty = chart default."
+}
+
 variable "model_api_keys" {
   type = object({
     anthropic = optional(string, "")

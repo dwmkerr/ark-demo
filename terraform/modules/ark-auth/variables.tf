@@ -30,6 +30,21 @@ variable "ark_version" {
   default = "0.1.63"
 }
 
+# Override the image the ark-dashboard chart deploys. Leave at defaults to
+# use the chart's pinned upstream image; set both to test a fork-built
+# branch (e.g. ghcr.io/dwmkerr/ark-dashboard:fork-build-fix-2318-<sha>).
+variable "dashboard_image_repository" {
+  type        = string
+  default     = ""
+  description = "Override repository for ark-dashboard image. Empty = use chart default."
+}
+
+variable "dashboard_image_tag" {
+  type        = string
+  default     = ""
+  description = "Override tag for ark-dashboard image. Empty = use chart default (Chart.AppVersion)."
+}
+
 variable "github_oauth_client_id" {
   type        = string
   sensitive   = true

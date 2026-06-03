@@ -74,6 +74,8 @@ module "ark_auth" {
   github_oauth_client_id     = var.github_oauth_client_id
   github_oauth_client_secret = var.github_oauth_client_secret
   demo_users                 = var.demo_users
+  dashboard_image_repository = var.dashboard_image_repository
+  dashboard_image_tag        = var.dashboard_image_tag
 
   # Needs cert-manager + the Ark operator present, and DNS resolving for the
   # Let's Encrypt HTTP-01 challenge.
