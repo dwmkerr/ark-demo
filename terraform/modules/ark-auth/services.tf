@@ -56,26 +56,34 @@ resource "helm_release" "ark_dashboard" {
   wait             = true
 
   values = [yamlencode({
-    app = {
-      # Dashboard proxies to ark-api in-cluster (same namespace).
-      config = {
-        arkApiService = { host = "ark-api", port = "80", protocol = "http" }
+    app = merge(
+      var.dashboard_image_repository == "" ? {} : {
+        image = {
+          repository = var.dashboard_image_repository
+          tag        = var.dashboard_image_tag
+        }
+      },
+      {
+        # Dashboard proxies to ark-api in-cluster (same namespace).
+        config = {
+          arkApiService = { host = "ark-api", port = "80", protocol = "http" }
+        }
+        env = [
+          { name = "BASE_URL", value = local.dashboard_url },                      # 0
+          { name = "AUTH_URL", value = "${local.dashboard_url}/api/auth" },        # 1
+          { name = "AUTH_SECRET", value = "" },                                    # 2 (set_sensitive)
+          { name = "OIDC_ISSUER_URL", value = local.dex_issuer },                  # 3
+          { name = "OIDC_CLIENT_ID", value = local.dashboard_client_id },          # 4
+          { name = "OIDC_CLIENT_SECRET", value = "" },                             # 5 (set_sensitive)
+          { name = "OIDC_PROVIDER_NAME", value = "GitHub" },                       # 6
+          { name = "OIDC_PROVIDER_ID", value = "dex" },                            # 7
+          { name = "SESSION_MAX_AGE", value = "1800" },                            # 8
+          { name = "NEXT_PUBLIC_TOKEN_REFRESH_INTERVAL_MS", value = "600000" },    # 9
+          { name = "NEXT_PUBLIC_FALLBACK_INACTIVITY_TIMEOUT", value = "1800000" }, # 10
+          { name = "AUTH_MODE", value = "sso" },                                   # 11
+        ]
       }
-      env = [
-        { name = "BASE_URL", value = local.dashboard_url },                      # 0
-        { name = "AUTH_URL", value = "${local.dashboard_url}/api/auth" },        # 1
-        { name = "AUTH_SECRET", value = "" },                                    # 2 (set_sensitive)
-        { name = "OIDC_ISSUER_URL", value = local.dex_issuer },                  # 3
-        { name = "OIDC_CLIENT_ID", value = local.dashboard_client_id },          # 4
-        { name = "OIDC_CLIENT_SECRET", value = "" },                             # 5 (set_sensitive)
-        { name = "OIDC_PROVIDER_NAME", value = "GitHub" },                       # 6
-        { name = "OIDC_PROVIDER_ID", value = "dex" },                            # 7
-        { name = "SESSION_MAX_AGE", value = "1800" },                            # 8
-        { name = "NEXT_PUBLIC_TOKEN_REFRESH_INTERVAL_MS", value = "600000" },    # 9
-        { name = "NEXT_PUBLIC_FALLBACK_INACTIVITY_TIMEOUT", value = "1800000" }, # 10
-        { name = "AUTH_MODE", value = "sso" },                                   # 11
-      ]
-    }
+    )
     ingress = {
       enabled     = true
       className   = "traefik"
