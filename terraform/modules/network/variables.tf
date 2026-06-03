@@ -4,7 +4,8 @@ variable "name" {
 
 variable "admin_cidrs" {
   type        = list(string)
-  description = "CIDRs allowed to reach SSH."
+  description = "CIDRs allowed to reach SSH. Empty = no SSH (use SSM Session Manager)."
+  default     = []
 }
 
 variable "api_ingress_cidrs" {
