@@ -44,6 +44,55 @@ variable "tenant_namespace" {
   description = "Tenant namespace for ark-tenant RBAC and the ark-demo CRs."
 }
 
+# --- GitHub SSO (Dex + ark-dashboard/api + per-user RBAC) ---
+
+variable "enable_sso" {
+  type        = bool
+  default     = false
+  description = "Install Dex GitHub SSO + ark-dashboard/api + RBAC. Needs a GitHub OAuth App, the vars below, and ports 80/443 reachable for TLS."
+}
+
+variable "dns_zone" {
+  type        = string
+  default     = "dwmkerr.com"
+  description = "Route53 hosted zone for the demo subdomain."
+}
+
+variable "subdomain" {
+  type        = string
+  default     = "ark-demo.dwmkerr.com"
+  description = "Stable subdomain for the demo. Hosts dashboard/dex/api.<subdomain> resolve here via a wildcard A record to the EIP."
+}
+
+variable "acme_email" {
+  type        = string
+  default     = ""
+  description = "Email for Let's Encrypt registration (required when enable_sso)."
+}
+
+variable "github_oauth_client_id" {
+  type        = string
+  default     = ""
+  sensitive   = true
+  description = "GitHub OAuth App client id (required when enable_sso)."
+}
+
+variable "github_oauth_client_secret" {
+  type        = string
+  default     = ""
+  sensitive   = true
+  description = "GitHub OAuth App client secret (required when enable_sso)."
+}
+
+variable "demo_users" {
+  type = list(object({
+    github = string
+    role   = string
+  }))
+  default     = []
+  description = "Per-GitHub-user role allowlist: role is viewer | editor | admin."
+}
+
 variable "model_api_keys" {
   type = object({
     anthropic = optional(string, "")
