@@ -108,6 +108,20 @@ variable "dashboard_image_tag" {
   description = "Override tag for ark-dashboard image. Empty = chart default."
 }
 
+# Same override surface for ark-api (useful while the JWKS-discovery fix
+# in upstream #2322 is in review).
+variable "ark_api_image_repository" {
+  type        = string
+  default     = ""
+  description = "Override repository for ark-api image. Empty = chart default."
+}
+
+variable "ark_api_image_tag" {
+  type        = string
+  default     = ""
+  description = "Override tag for ark-api image. Empty = chart default."
+}
+
 variable "model_api_keys" {
   type = object({
     anthropic = optional(string, "")
