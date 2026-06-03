@@ -41,3 +41,13 @@ output "tenant_namespace" {
 output "demo_release" {
   value = module.ark.release_name
 }
+
+output "sso_dashboard_url" {
+  description = "Dashboard URL when SSO is enabled."
+  value       = try(module.ark_auth[0].dashboard_url, null)
+}
+
+output "github_oauth_callback_url" {
+  description = "Set this as the GitHub OAuth App's Authorization callback URL."
+  value       = try(module.ark_auth[0].github_oauth_callback_url, null)
+}
