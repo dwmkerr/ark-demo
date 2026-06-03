@@ -41,13 +41,17 @@ resource "aws_security_group" "node" {
   description = "k3s node access"
   vpc_id      = aws_vpc.this.id
 
-  # SSH and the k3s API server, locked to the admin CIDR.
-  ingress {
-    description = "SSH"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = var.admin_cidrs
+  # SSH, only when admin CIDRs are given. SSM Session Manager is the primary
+  # access path, so SSH is optional (and absent in CI, which sets no CIDRs).
+  dynamic "ingress" {
+    for_each = length(var.admin_cidrs) > 0 ? [1] : []
+    content {
+      description = "SSH"
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+      cidr_blocks = var.admin_cidrs
+    }
   }
 
   # k3s API. Authentication is client-cert mTLS, so this can be opened to CI

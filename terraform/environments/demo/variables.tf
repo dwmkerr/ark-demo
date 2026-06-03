@@ -5,7 +5,8 @@ variable "region" {
 
 variable "admin_cidrs" {
   type        = list(string)
-  description = "CIDRs allowed to reach SSH (e.g. your IP/32)."
+  description = "CIDRs allowed to reach SSH (e.g. your IP/32). Empty = no SSH; use SSM."
+  default     = []
 }
 
 variable "api_ingress_cidrs" {
