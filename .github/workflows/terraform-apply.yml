@@ -16,11 +16,10 @@ env:
   TF_VAR_model_api_keys: ${{ secrets.MODEL_API_KEYS_JSON }}
 
 jobs:
-  apply:
+  # Runs immediately and unguarded so the plan is visible BEFORE approval. The
+  # saved plan is handed to the apply job, so apply runs exactly what you review.
+  plan:
     runs-on: ubuntu-latest
-    # The 'demo' environment carries the required-reviewer approval gate.
-    # Configure reviewers in repo Settings > Environments > demo.
-    environment: demo
     defaults:
       run:
         working-directory: ${{ env.TF_WORKDIR }}
@@ -42,4 +41,51 @@ jobs:
 
       - run: terraform init
 
-      - run: terraform apply -auto-approve -input=false
+      - run: terraform plan -out=tfplan -input=false
+
+      - name: Plan summary
+        run: |
+          {
+            echo '```'
+            terraform show -no-color tfplan
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: ${{ env.TF_WORKDIR }}/tfplan
+          retention-days: 1
+
+  apply:
+    needs: plan
+    runs-on: ubuntu-latest
+    # 'demo' environment carries the required-reviewer gate. Review the plan
+    # job above, then approve here. Apply uses the saved plan — no surprises.
+    environment: demo
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKDIR }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-west-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - uses: azure/setup-helm@v4
+      - run: helm dependency update ../../../chart
+
+      - run: terraform init
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: ${{ env.TF_WORKDIR }}
+
+      - run: terraform apply -input=false tfplan
