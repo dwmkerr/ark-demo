@@ -30,6 +30,19 @@ variable "ark_version" {
   default = "0.1.63"
 }
 
+# Override the chart registry/version for ark-api + ark-dashboard only (e.g. a
+# fork that publishes impersonation-capable charts the released 0.1.63 lacks).
+# Empty = use ark_registry/ark_version.
+variable "ark_chart_registry" {
+  type    = string
+  default = ""
+}
+
+variable "ark_chart_version" {
+  type    = string
+  default = ""
+}
+
 # Override the image the ark-dashboard chart deploys. Leave at defaults to
 # use the chart's pinned upstream image; set both to test a fork-built
 # branch (e.g. ghcr.io/dwmkerr/ark-dashboard:fork-build-fix-2318-<sha>).

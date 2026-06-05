@@ -133,3 +133,15 @@ variable "model_api_keys" {
   default     = {}
   description = "Set via TF_VAR_model_api_keys or HCP/CI variables, not in VCS."
 }
+
+variable "ark_chart_registry" {
+  type        = string
+  default     = ""
+  description = "Override chart registry for ark-api/ark-dashboard (e.g. oci://ghcr.io/dwmkerr/charts). Empty = ark_registry."
+}
+
+variable "ark_chart_version" {
+  type        = string
+  default     = ""
+  description = "Override chart version for ark-api/ark-dashboard (e.g. 0.1.64-fork.2318). Empty = ark_version."
+}

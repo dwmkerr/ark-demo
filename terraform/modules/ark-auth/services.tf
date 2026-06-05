@@ -7,9 +7,9 @@
 
 resource "helm_release" "ark_api" {
   name             = "ark-api"
-  repository       = var.ark_registry
+  repository       = local.chart_registry
   chart            = "ark-api"
-  version          = var.ark_version
+  version          = local.chart_version
   namespace        = var.ark_namespace
   create_namespace = true
   wait             = true
@@ -56,9 +56,9 @@ resource "helm_release" "ark_api" {
 
 resource "helm_release" "ark_dashboard" {
   name             = "ark-dashboard"
-  repository       = var.ark_registry
+  repository       = local.chart_registry
   chart            = "ark-dashboard"
-  version          = var.ark_version
+  version          = local.chart_version
   namespace        = var.ark_namespace
   create_namespace = true
   wait             = true

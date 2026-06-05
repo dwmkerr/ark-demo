@@ -78,6 +78,8 @@ module "ark_auth" {
   dashboard_image_tag        = var.dashboard_image_tag
   ark_api_image_repository   = var.ark_api_image_repository
   ark_api_image_tag          = var.ark_api_image_tag
+  ark_chart_registry         = var.ark_chart_registry
+  ark_chart_version          = var.ark_chart_version
 
   # Needs cert-manager + the Ark operator present, and DNS resolving for the
   # Let's Encrypt HTTP-01 challenge.

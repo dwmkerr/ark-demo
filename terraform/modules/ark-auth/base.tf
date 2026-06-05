@@ -19,6 +19,10 @@ locals {
 
   # GitHub usernames are impersonated as the k8s user; this claim carries them.
   username_claim = "preferred_username"
+
+  # ark-api/ark-dashboard chart source — fork override or the default registry.
+  chart_registry = var.ark_chart_registry != "" ? var.ark_chart_registry : var.ark_registry
+  chart_version  = var.ark_chart_version != "" ? var.ark_chart_version : var.ark_version
 }
 
 # Secret Dex shares with the dashboard OIDC client.
