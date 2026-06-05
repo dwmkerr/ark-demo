@@ -84,14 +84,8 @@ variable "github_oauth_client_secret" {
   description = "GitHub OAuth App client secret (required when enable_sso)."
 }
 
-variable "demo_users" {
-  type = list(object({
-    github = string
-    role   = string
-  }))
-  default     = []
-  description = "Per-GitHub-user role allowlist: role is viewer | editor | admin."
-}
+# Note: the per-user allowlist now lives in demo-users.yaml (read directly in
+# main.tf), not a variable — versioned + PR-reviewed.
 
 # Override the image the ark-dashboard chart deploys. Leave empty to use
 # the chart's pinned upstream image; set both to test a fork-built branch
