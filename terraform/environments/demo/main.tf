@@ -73,7 +73,7 @@ module "ark_auth" {
   ark_version                = var.ark_version
   github_oauth_client_id     = var.github_oauth_client_id
   github_oauth_client_secret = var.github_oauth_client_secret
-  demo_users                 = var.demo_users
+  demo_users                 = yamldecode(file("${path.module}/demo-users.yaml")).users
   dashboard_image_repository = var.dashboard_image_repository
   dashboard_image_tag        = var.dashboard_image_tag
   ark_api_image_repository   = var.ark_api_image_repository

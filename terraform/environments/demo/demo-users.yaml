@@ -1,0 +1,14 @@
+# Demo access allowlist: GitHub username -> role.
+#
+# role is one of: viewer | editor | admin
+#   viewer  read-only (get/list/watch models, agents, teams, queries, ...)
+#   editor  viewer + run queries + edit agents/teams/tools
+#   admin   full control of Ark resources in the tenant namespace
+#
+# Add a person: add an entry below, open a PR, merge -> the apply binds them.
+# A GitHub user NOT listed can authenticate via Dex but gets no RBAC (the
+# dashboard loads but every resource call is forbidden), so this list is the
+# access gate.
+users:
+  - github: dwmkerr
+    role: admin
