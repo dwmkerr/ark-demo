@@ -40,7 +40,7 @@ resource "kubernetes_role" "ark_viewer" {
 
   rule {
     api_groups = [""]
-    resources  = ["pods", "pods/log"]
+    resources  = ["pods", "pods/log", "events"]
     verbs      = ["get", "list", "watch"]
   }
 }
@@ -63,7 +63,7 @@ resource "kubernetes_role" "ark_editor" {
 
   rule {
     api_groups = [""]
-    resources  = ["pods", "pods/log"]
+    resources  = ["pods", "pods/log", "events"]
     verbs      = ["get", "list", "watch"]
   }
 
@@ -82,7 +82,7 @@ resource "kubernetes_role" "ark_editor" {
 }
 
 # ark-admin: full control of all Ark resources in the namespace, plus read
-# access to the pods, logs, configmaps and secrets backing them.
+# access to the pods, logs, events, configmaps and secrets backing them.
 resource "kubernetes_role" "ark_admin" {
   metadata {
     name      = "ark-admin"
@@ -97,7 +97,7 @@ resource "kubernetes_role" "ark_admin" {
 
   rule {
     api_groups = [""]
-    resources  = ["pods", "pods/log", "configmaps", "secrets"]
+    resources  = ["pods", "pods/log", "events", "configmaps", "secrets"]
     verbs      = ["get", "list", "watch"]
   }
 }
