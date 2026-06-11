@@ -10,5 +10,20 @@
 # dashboard loads but every resource call is forbidden), so this list is the
 # access gate.
 users:
+  # admins — full control of Ark resources in the tenant namespace
   - github: dwmkerr
     role: admin
+  - github: Nab-0
+    role: admin
+  # editors — viewer + run queries + edit agents/teams/tools
+  - github: skazinka
+    role: editor
+  - github: amanvr
+    role: editor
+  - github: CDimonaco
+    role: editor
+  # viewers — read-only
+  - github: skokaina
+    role: viewer
+  - github: cm94242
+    role: viewer
