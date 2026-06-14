@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.1.8](https://github.com/dwmkerr/ark-demo/compare/v0.1.7...v0.1.8) (2026-06-14)
+
+
+### Features
+
+* add demo team to access allowlist with nuanced RBAC ([#49](https://github.com/dwmkerr/ark-demo/issues/49)) ([457d630](https://github.com/dwmkerr/ark-demo/commit/457d6307baa3fb33443b3814d6f818a20c513732))
+* add Notion MCP + note-taker agent and Claude Agent SDK developer agents ([#33](https://github.com/dwmkerr/ark-demo/issues/33)) ([20b0d86](https://github.com/dwmkerr/ark-demo/commit/20b0d8692fa52fb843d3e67be0a470a961c221c3))
+* add shellwright MCP server and path fix for Ark v0.1.49 ([#29](https://github.com/dwmkerr/ark-demo/issues/29)) ([817210a](https://github.com/dwmkerr/ark-demo/commit/817210ae92ea0d9a448086a28a2a455c29738cf1))
+* allow manual dispatch of terraform-apply ([#41](https://github.com/dwmkerr/ark-demo/issues/41)) ([f12b297](https://github.com/dwmkerr/ark-demo/commit/f12b297fbb46bff8f4c3ccf69d665cb393c56c66))
+* ark-api image override for JWKS hotfix ([#2321](https://github.com/dwmkerr/ark-demo/issues/2321)) ([#45](https://github.com/dwmkerr/ark-demo/issues/45)) ([2743316](https://github.com/dwmkerr/ark-demo/commit/274331676640052ecb7f482265d1ddfb1a128ae8))
+* ark-dashboard image override for SSO cookie hotfix ([#2318](https://github.com/dwmkerr/ark-demo/issues/2318)) ([#44](https://github.com/dwmkerr/ark-demo/issues/44)) ([bee7c82](https://github.com/dwmkerr/ark-demo/commit/bee7c8296e22ba28bb0ae845f4ce47400f66403d))
+* demo access allowlist as committed YAML ([#47](https://github.com/dwmkerr/ark-demo/issues/47)) ([8ed8062](https://github.com/dwmkerr/ark-demo/commit/8ed8062572fb7083788dd1dfbfaad095fbfb50b2))
+* fork charts for ark-api/dashboard (impersonation) ([#46](https://github.com/dwmkerr/ark-demo/issues/46)) ([08ab57d](https://github.com/dwmkerr/ark-demo/commit/08ab57d34b7a29352b83355dc263ba39bdfc076c))
+* GitHub SSO via Dex + per-user RBAC ([#42](https://github.com/dwmkerr/ark-demo/issues/42)) ([dc3576e](https://github.com/dwmkerr/ark-demo/commit/dc3576e86b3101bc88d88fdbd7b9a4685d9737e8))
+* OpenAI responses demos ([#32](https://github.com/dwmkerr/ark-demo/issues/32)) ([ca288f7](https://github.com/dwmkerr/ark-demo/commit/ca288f78915069768f3f12ee36b219fe280ad243))
+* reviewable plan + gated apply jobs ([#37](https://github.com/dwmkerr/ark-demo/issues/37)) ([66c323a](https://github.com/dwmkerr/ark-demo/commit/66c323a87b426dfa93fc4fd9deec42120ec44bf2))
+* skip default model if it already exists in cluster ([#31](https://github.com/dwmkerr/ark-demo/issues/31)) ([1fb2eb5](https://github.com/dwmkerr/ark-demo/commit/1fb2eb565ff14dc864a8eeb7373add6d8fd255a3))
+* terraform demo environment with plan/apply pipeline ([#34](https://github.com/dwmkerr/ark-demo/issues/34)) ([d211f5b](https://github.com/dwmkerr/ark-demo/commit/d211f5b3bf03b5edd5b1debc2aba86c66e7fb044))
+
+
+### Bug Fixes
+
+* anthropic-only demo with default + claude-4-opus models ([#39](https://github.com/dwmkerr/ark-demo/issues/39)) ([07a09da](https://github.com/dwmkerr/ark-demo/commit/07a09da53c9a4aa6aafc79d123cc66770fc72ab1))
+* ark-api/dashboard env injection (full lists) ([#43](https://github.com/dwmkerr/ark-demo/issues/43)) ([101e79e](https://github.com/dwmkerr/ark-demo/commit/101e79e550fc30d6b8d4524a48c56e07ba0bac6d))
+* build chart OCI deps in CI, disable helm provider dep resolution ([#36](https://github.com/dwmkerr/ark-demo/issues/36)) ([3b6c935](https://github.com/dwmkerr/ark-demo/commit/3b6c9355bb9e4e06ca3cf248d7cf225534ce178d))
+* grant events read to demo roles ([#48](https://github.com/dwmkerr/ark-demo/issues/48)) ([37c83de](https://github.com/dwmkerr/ark-demo/commit/37c83deacc2442b407677730319f3ecd2185ba72))
+* make SSH optional so CI apply needs no admin_cidrs ([#35](https://github.com/dwmkerr/ark-demo/issues/35)) ([7064ce5](https://github.com/dwmkerr/ark-demo/commit/7064ce53db2ea721444168d92639762d35030bde))
+* supply ark-demo chart a values file ([#38](https://github.com/dwmkerr/ark-demo/issues/38)) ([545a916](https://github.com/dwmkerr/ark-demo/commit/545a9165b5b2b8ecfa0e662fea71d6af0459d800))
+* use current Claude 4 model ids ([#40](https://github.com/dwmkerr/ark-demo/issues/40)) ([d105e4e](https://github.com/dwmkerr/ark-demo/commit/d105e4e3f96529459d6c93beb4034f74418d462d))
+
 ## [0.1.7](https://github.com/dwmkerr/ark-demo/compare/v0.1.6...v0.1.7) (2025-12-22)
 
 
