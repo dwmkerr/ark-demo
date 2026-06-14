@@ -107,6 +107,15 @@ resource "aws_instance" "node" {
   })
 
   tags = { Name = "${var.name}-node" }
+
+  # The AMI is resolved from the al2023 "latest" SSM alias, which moves whenever
+  # AWS publishes a new image. Without this, the next apply after an AMI release
+  # replaces the node — a fresh root volume that reinstalls k3s and wipes all
+  # cluster state. Pin the running node to its launch AMI; rebuilds from scratch
+  # (taint/replace) still pick up the latest.
+  lifecycle {
+    ignore_changes = [ami]
+  }
 }
 
 resource "aws_eip_association" "node" {
