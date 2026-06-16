@@ -76,6 +76,24 @@ resource "helm_release" "ark_tenant" {
   depends_on = [helm_release.ark_completions]
 }
 
+# ark-broker — in-memory event bus for chat streaming (messages/chunks/traces).
+# Installed into the tenant namespace so its default Memory CRD ("default",
+# created by the chart) lives where tenant queries resolve the broker address.
+# Without it the dashboard chat shows "Failed to connect to stream".
+resource "helm_release" "ark_broker" {
+  count = var.install_ark ? 1 : 0
+
+  name             = "ark-broker"
+  repository       = var.ark_registry
+  chart            = "ark-broker"
+  version          = var.ark_version
+  namespace        = var.tenant_namespace
+  create_namespace = true
+  wait             = true
+
+  depends_on = [helm_release.ark_tenant]
+}
+
 # The ark-demo chart (this repo): Models/Agents/Teams/MCP CRs. A provider's key
 # is set only when supplied, mirroring the chart's env-var enable behaviour.
 resource "helm_release" "ark_demo" {
