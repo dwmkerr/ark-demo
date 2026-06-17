@@ -40,7 +40,7 @@ resource "kubernetes_role" "ark_viewer" {
 
   rule {
     api_groups = [""]
-    resources  = ["pods", "pods/log", "events"]
+    resources  = ["pods", "pods/log", "events", "services"]
     verbs      = ["get", "list", "watch"]
   }
 }
@@ -63,7 +63,7 @@ resource "kubernetes_role" "ark_editor" {
 
   rule {
     api_groups = [""]
-    resources  = ["pods", "pods/log", "events"]
+    resources  = ["pods", "pods/log", "events", "services"]
     verbs      = ["get", "list", "watch"]
   }
 
@@ -97,7 +97,7 @@ resource "kubernetes_role" "ark_admin" {
 
   rule {
     api_groups = [""]
-    resources  = ["pods", "pods/log", "events", "configmaps", "secrets"]
+    resources  = ["pods", "pods/log", "events", "configmaps", "secrets", "services"]
     verbs      = ["get", "list", "watch"]
   }
 }
