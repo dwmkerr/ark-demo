@@ -31,6 +31,11 @@ jobs:
         with:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
+      # chart/charts/ is gitignored, so a fresh checkout has no subcharts and
+      # the helm provider cannot even read the release it is asked to destroy.
+      - uses: azure/setup-helm@v4
+      - run: helm dependency update ../../../chart
+
       - run: terraform init
 
       - run: terraform destroy -auto-approve -input=false
